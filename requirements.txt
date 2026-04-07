@@ -1,8 +1,11 @@
-scikit-learn
-pandas
-numpy
+flask
+gunicorn
 joblib
+numpy
+pandas
+scikit-learn
+scipy
+imbalanced-learn
 networkx
 radon
-imbalanced-learn
-flask
+werkzeug
