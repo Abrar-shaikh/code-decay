@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 from coderot.analyzer import analyze_codebase, extract_zip, LANGUAGE_MAP
+from data_collector import save_batch, get_dataset_stats
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
@@ -28,7 +29,10 @@ FEATURE_ORDER = [
 @app.route('/')
 def home():
     supported = sorted(set(LANGUAGE_MAP.values()))
-    return render_template('index.html', supported_languages=supported)
+    stats     = get_dataset_stats()
+    return render_template('index.html',
+                           supported_languages=supported,
+                           dataset_rows=stats['rows'])
 
 
 @app.route('/analyze', methods=['POST'])
@@ -47,7 +51,7 @@ def analyze():
         zip_file.save(tmp_zip.name)
         tmp_zip.close()
 
-        tmp_dir = extract_zip(tmp_zip.name)
+        tmp_dir    = extract_zip(tmp_zip.name)
         files_data = analyze_codebase(tmp_dir)
 
         if not files_data:
@@ -55,7 +59,7 @@ def analyze():
                 'error': 'No supported source files found in the ZIP.'
             })
 
-        results = []
+        results     = []
         lang_counts = {}
 
         for info in files_data:
@@ -90,25 +94,25 @@ def analyze():
                 'agree'     : rf_pred == svm_pred,
                 'risk_score': risk,
                 'metrics': {
-                    'Lines of code'         : info.get('lines_of_code', 0),
-                    'Cyclomatic complexity' : info.get(
-                        'cyclomatic_complexity', 0),
-                    'Functions'             : info.get('num_functions', 0),
-                    'Classes'               : info.get('num_classes', 0),
-                    'Comment density'       : info.get('comment_density', 0),
-                    'Static warnings'       : info.get(
-                        'static_analysis_warnings', 0),
-                    'Security issues'       : info.get(
-                        'security_vulnerabilities', 0),
-                    'Duplication %'         : info.get(
-                        'duplication_percentage', 0),
-                    'Test coverage est.'    : info.get('test_coverage', 0),
-                    'Coupling'              : info.get(
-                        'coupling_between_objects', 0),
+                    'Lines of code'        : info.get('lines_of_code', 0),
+                    'Cyclomatic complexity': info.get('cyclomatic_complexity', 0),
+                    'Functions'            : info.get('num_functions', 0),
+                    'Classes'              : info.get('num_classes', 0),
+                    'Comment density'      : info.get('comment_density', 0),
+                    'Static warnings'      : info.get('static_analysis_warnings', 0),
+                    'Security issues'      : info.get('security_vulnerabilities', 0),
+                    'Duplication %'        : info.get('duplication_percentage', 0),
+                    'Test coverage est.'   : info.get('test_coverage', 0),
+                    'Coupling'             : info.get('coupling_between_objects', 0),
                 }
             })
 
         results.sort(key=lambda x: x['risk_score'], reverse=True)
+
+        # ── Save metrics to community dataset in background ──────────────────
+        # User's actual code is already deleted below in the finally block.
+        # Only the 26 extracted numbers per file are saved — no code, no paths.
+        save_batch(results, files_data)
 
         summary = {
             'total_files': len(results),
@@ -125,6 +129,7 @@ def analyze():
         return jsonify({'error': str(e)})
 
     finally:
+        # ── Always delete user's code immediately ────────────────────────────
         try:
             os.unlink(tmp_zip.name)
         except:
@@ -134,6 +139,12 @@ def analyze():
                 shutil.rmtree(tmp_dir)
         except:
             pass
+
+
+@app.route('/dataset-stats')
+def dataset_stats():
+    """Returns live stats about the community dataset for the counter on the page."""
+    return jsonify(get_dataset_stats())
 
 
 if __name__ == '__main__':
