@@ -47,7 +47,7 @@ def _get_sheet():
         # Get credentials from environment variable
         import json
         # Try secret file first (Render), then environment variable (local)
-        secret_path = '/etc/secrets/google_credentials.json'
+        secret_path = 'google_credentials.json'
         if os.path.exists(secret_path):
             with open(secret_path, 'r') as f:
                 creds_dict = json.load(f)
