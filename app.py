@@ -9,9 +9,12 @@ from data_collector import save_batch, get_dataset_stats
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
 
-# Load saved models
-rf_model      = joblib.load('saved_models/random_forest_model.pkl')
-svm_model     = joblib.load('saved_models/svm_model.pkl')
+# Load all 5 models
+rf_model  = joblib.load('saved_models/random_forest_model.pkl')
+svm_model = joblib.load('saved_models/svm_model.pkl')
+ada_model = joblib.load('saved_models/adaboost_model.pkl')
+gb_model  = joblib.load('saved_models/gradient_boost_model.pkl')
+xgb_model = joblib.load('saved_models/xgboost_model.pkl')
 scaler        = joblib.load('saved_models/scaler.pkl')
 feature_names = joblib.load('saved_models/feature_names.pkl')
 
@@ -24,6 +27,38 @@ FEATURE_ORDER = [
     'lack_of_cohesion', 'build_failures', 'static_analysis_warnings',
     'security_vulnerabilities', 'performance_issues'
 ]
+
+
+def get_prediction(model, scaled):
+    """Get prediction and confidence from any model."""
+    pred = int(model.predict(scaled)[0])
+    conf = float(model.predict_proba(scaled)[0][pred] * 100)
+    return pred, round(conf, 1)
+
+
+def calculate_risk(predictions):
+    """
+    Calculate overall risk score from all 5 models.
+    Weighted: GB and XGBoost get more weight as top performers.
+    """
+    weights = {
+        'rf' : 0.15,
+        'svm': 0.15,
+        'ada': 0.10,
+        'gb' : 0.35,   # highest weight — 100% accuracy
+        'xgb': 0.25,   # second highest weight
+    }
+    score = 0
+    for key, weight in weights.items():
+        pred, conf = predictions[key]
+        score += (conf if pred == 1 else 100 - conf) * weight
+    return round(score, 1)
+
+
+def majority_vote(predictions):
+    """Returns True if majority of models say defective."""
+    votes = sum(1 for pred, _ in predictions.values() if pred == 1)
+    return votes >= 3  # 3 or more out of 5 say defective
 
 
 @app.route('/')
@@ -69,30 +104,38 @@ def analyze():
             vec    = [info.get(f, 0) for f in FEATURE_ORDER]
             scaled = scaler.transform([vec])
 
-            rf_pred  = int(rf_model.predict(scaled)[0])
-            rf_conf  = float(
-                rf_model.predict_proba(scaled)[0][rf_pred] * 100)
-            svm_pred = int(svm_model.predict(scaled)[0])
-            svm_conf = float(
-                svm_model.predict_proba(scaled)[0][svm_pred] * 100)
+            # Get predictions from all 5 models
+            predictions = {
+                'rf' : get_prediction(rf_model,  scaled),
+                'svm': get_prediction(svm_model, scaled),
+                'ada': get_prediction(ada_model, scaled),
+                'gb' : get_prediction(gb_model,  scaled),
+                'xgb': get_prediction(xgb_model, scaled),
+            }
 
-            risk = round(
-                (rf_conf  if rf_pred  == 1 else 100 - rf_conf)  * 0.6 +
-                (svm_conf if svm_pred == 1 else 100 - svm_conf) * 0.4, 1)
+            risk        = calculate_risk(predictions)
+            is_defective = majority_vote(predictions)
+            votes_defective = sum(
+                1 for pred, _ in predictions.values() if pred == 1)
 
             display_path = info['filepath'].replace(
                 tmp_dir, '').lstrip('/\\')
 
             results.append({
-                'filename'  : info['filename'],
-                'filepath'  : display_path,
-                'language'  : lang,
-                'rf_pred'   : rf_pred,
-                'rf_conf'   : round(rf_conf, 1),
-                'svm_pred'  : svm_pred,
-                'svm_conf'  : round(svm_conf, 1),
-                'agree'     : rf_pred == svm_pred,
-                'risk_score': risk,
+                'filename'       : info['filename'],
+                'filepath'       : display_path,
+                'language'       : lang,
+                'is_defective'   : is_defective,
+                'votes_defective': votes_defective,
+                'risk_score'     : risk,
+                'agree'          : votes_defective == 5 or votes_defective == 0,
+                'models': {
+                    'Random Forest'     : {'pred': predictions['rf'][0],  'conf': predictions['rf'][1]},
+                    'SVM'               : {'pred': predictions['svm'][0], 'conf': predictions['svm'][1]},
+                    'AdaBoost'          : {'pred': predictions['ada'][0], 'conf': predictions['ada'][1]},
+                    'Gradient Boosting' : {'pred': predictions['gb'][0],  'conf': predictions['gb'][1]},
+                    'XGBoost'           : {'pred': predictions['xgb'][0], 'conf': predictions['xgb'][1]},
+                },
                 'metrics': {
                     'Lines of code'        : info.get('lines_of_code', 0),
                     'Cyclomatic complexity': info.get('cyclomatic_complexity', 0),
@@ -109,15 +152,13 @@ def analyze():
 
         results.sort(key=lambda x: x['risk_score'], reverse=True)
 
-        # ── Save metrics to community dataset in background ──────────────────
-        # User's actual code is already deleted below in the finally block.
-        # Only the 26 extracted numbers per file are saved — no code, no paths.
+        # Save to community dataset in background
         save_batch(results, files_data)
 
         summary = {
             'total_files': len(results),
-            'defective'  : sum(1 for r in results if r['rf_pred'] == 1),
-            'clean'      : sum(1 for r in results if r['rf_pred'] == 0),
+            'defective'  : sum(1 for r in results if r['is_defective']),
+            'clean'      : sum(1 for r in results if not r['is_defective']),
             'avg_risk'   : round(
                 sum(r['risk_score'] for r in results) / len(results), 1),
             'lang_counts': lang_counts,
@@ -129,7 +170,6 @@ def analyze():
         return jsonify({'error': str(e)})
 
     finally:
-        # ── Always delete user's code immediately ────────────────────────────
         try:
             os.unlink(tmp_zip.name)
         except:
@@ -143,7 +183,6 @@ def analyze():
 
 @app.route('/dataset-stats')
 def dataset_stats():
-    """Returns live stats about the community dataset for the counter on the page."""
     return jsonify(get_dataset_stats())
 
 
