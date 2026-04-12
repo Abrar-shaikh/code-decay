@@ -12,6 +12,21 @@
     header h1 { font-size:2.2rem; color:#fff; }
     header h1 span { color:#4f8ef7; }
     header p { color:#888; margin-top:8px; font-size:0.95rem; }
+
+    /* Live counter banner */
+    .counter-banner {
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      background:#1a1d27; border:1px solid #2a2d3e; border-radius:10px;
+      padding:10px 20px; margin-bottom:24px;
+    }
+    .counter-dot {
+      width:8px; height:8px; border-radius:50%; background:#4f8ef7;
+      animation:pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .counter-text { color:#888; font-size:0.88rem; }
+    .counter-text strong { color:#4f8ef7; font-size:1rem; }
+
     .card { background:#1a1d27; border:1px solid #2a2d3e; border-radius:16px; padding:24px; margin-bottom:20px; }
     .card h2 { font-size:0.82rem; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:16px; }
     .upload-zone { border:2px dashed #2a2d3e; border-radius:12px; padding:40px; text-align:center; cursor:pointer; transition:border-color .2s; }
@@ -20,6 +35,16 @@
     .upload-zone .icon { font-size:2.5rem; margin-bottom:12px; }
     .upload-zone .hint { color:#555; font-size:0.82rem; margin-top:8px; }
     .upload-zone .chosen { color:#4f8ef7; font-weight:600; margin-top:8px; font-size:0.9rem; }
+
+    /* Privacy badge */
+    .privacy-note {
+      display:flex; align-items:center; gap:8px; margin-top:14px;
+      background:#0f1117; border:1px solid #2a2d3e; border-radius:8px; padding:10px 14px;
+    }
+    .privacy-note .shield { font-size:1rem; }
+    .privacy-note p { font-size:0.8rem; color:#555; }
+    .privacy-note p strong { color:#7f7; }
+
     .lang-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
     .pill { background:#0f1117; border:1px solid #2a2d3e; border-radius:20px; padding:3px 10px; font-size:0.75rem; color:#888; }
     .btn { width:100%; padding:13px; border:none; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; background:#4f8ef7; color:#fff; transition:opacity .2s; margin-top:16px; }
@@ -65,14 +90,34 @@
     .progress { width:100%; background:#2a2d3e; border-radius:6px; height:6px; margin-top:12px; overflow:hidden; }
     .progress-bar { height:100%; background:#4f8ef7; border-radius:6px; animation:prog 2s ease-in-out infinite; }
     @keyframes prog { 0%{width:0%} 50%{width:70%} 100%{width:100%} }
+
+    /* Contribution toast */
+    .toast {
+      position:fixed; bottom:24px; right:24px; background:#1a1d27;
+      border:1px solid #2a2d3e; border-radius:12px; padding:14px 18px;
+      font-size:0.85rem; color:#e0e0e0; max-width:300px;
+      transform:translateY(100px); opacity:0;
+      transition:transform .4s ease, opacity .4s ease; z-index:999;
+    }
+    .toast.show { transform:translateY(0); opacity:1; }
+    .toast strong { color:#7f7; }
   </style>
 </head>
 <body>
 <div class="container">
+
   <header>
     <h1>Code <span>Decay</span> Detector</h1>
     <p>Upload any project as a ZIP — works with Python, JavaScript, Java, C++, and 19 more languages</p>
   </header>
+
+  <!-- Live community counter -->
+  <div class="counter-banner">
+    <div class="counter-dot"></div>
+    <p class="counter-text">
+      Community dataset: <strong id="rowCount">{{ dataset_rows | default(0) }}</strong> files analyzed and counting
+    </p>
+  </div>
 
   <div class="card">
     <h2>Upload your project</h2>
@@ -86,6 +131,17 @@
       <div>Drag & drop your project ZIP here, or click to browse</div>
       <div class="hint">Max 50MB · ZIP file only · All source files inside will be scanned</div>
       <div class="chosen" id="chosenFile"></div>
+    </div>
+
+    <!-- Privacy note -->
+    <div class="privacy-note">
+      <span class="shield">🔒</span>
+      <p>
+        <strong>Your code is never stored.</strong>
+        Only anonymised metrics (numbers like complexity scores) are collected
+        to improve future model accuracy. Your actual source files are deleted
+        immediately after analysis.
+      </p>
     </div>
 
     <div style="margin-top:16px">
@@ -112,7 +168,11 @@
     <div class="lang-bar" id="langBar"></div>
     <div id="fileList"></div>
   </div>
+
 </div>
+
+<!-- Contribution toast notification -->
+<div class="toast" id="toast"></div>
 
 <script>
 let selectedFile = null;
@@ -154,11 +214,35 @@ async function analyzeProject() {
     renderLangBar(data.summary.lang_counts);
     renderFiles(data.results);
     document.getElementById('results').style.display = 'block';
+
+    // Show contribution toast
+    showToast(data.summary.total_files);
+
+    // Refresh the counter after a short delay
+    setTimeout(refreshCounter, 2000);
+
   } catch(e) {
     document.getElementById('loader').style.display = 'none';
     document.getElementById('analyzeBtn').disabled = false;
     alert('Something went wrong: ' + e.message);
   }
+}
+
+function showToast(fileCount) {
+  const toast = document.getElementById('toast');
+  toast.innerHTML = `<strong>✓ Thank you!</strong> ${fileCount} file metric${fileCount > 1 ? 's' : ''} anonymously contributed to our community dataset.`;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 4000);
+}
+
+function refreshCounter() {
+  fetch('/dataset-stats')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('rowCount').textContent =
+        d.rows.toLocaleString();
+    })
+    .catch(() => {});
 }
 
 function renderSummary(s) {
