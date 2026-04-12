@@ -9,3 +9,5 @@ imbalanced-learn
 networkx
 radon
 werkzeug
+gspread
+google-auth
