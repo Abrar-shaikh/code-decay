@@ -13,16 +13,8 @@
     header h1 span { color:#4f8ef7; }
     header p { color:#888; margin-top:8px; font-size:0.95rem; }
 
-    /* Live counter banner */
-    .counter-banner {
-      display:flex; align-items:center; justify-content:center; gap:10px;
-      background:#1a1d27; border:1px solid #2a2d3e; border-radius:10px;
-      padding:10px 20px; margin-bottom:24px;
-    }
-    .counter-dot {
-      width:8px; height:8px; border-radius:50%; background:#4f8ef7;
-      animation:pulse 2s ease-in-out infinite;
-    }
+    .counter-banner { display:flex; align-items:center; justify-content:center; gap:10px; background:#1a1d27; border:1px solid #2a2d3e; border-radius:10px; padding:10px 20px; margin-bottom:24px; }
+    .counter-dot { width:8px; height:8px; border-radius:50%; background:#4f8ef7; animation:pulse 2s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
     .counter-text { color:#888; font-size:0.88rem; }
     .counter-text strong { color:#4f8ef7; font-size:1rem; }
@@ -36,11 +28,7 @@
     .upload-zone .hint { color:#555; font-size:0.82rem; margin-top:8px; }
     .upload-zone .chosen { color:#4f8ef7; font-weight:600; margin-top:8px; font-size:0.9rem; }
 
-    /* Privacy badge */
-    .privacy-note {
-      display:flex; align-items:center; gap:8px; margin-top:14px;
-      background:#0f1117; border:1px solid #2a2d3e; border-radius:8px; padding:10px 14px;
-    }
+    .privacy-note { display:flex; align-items:center; gap:8px; margin-top:14px; background:#0f1117; border:1px solid #2a2d3e; border-radius:8px; padding:10px 14px; }
     .privacy-note .shield { font-size:1rem; }
     .privacy-note p { font-size:0.8rem; color:#555; }
     .privacy-note p strong { color:#7f7; }
@@ -50,13 +38,16 @@
     .btn { width:100%; padding:13px; border:none; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; background:#4f8ef7; color:#fff; transition:opacity .2s; margin-top:16px; }
     .btn:hover { opacity:.85; }
     .btn:disabled { opacity:.4; cursor:not-allowed; }
+
     .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
     .stat { background:#1a1d27; border:1px solid #2a2d3e; border-radius:12px; padding:18px; text-align:center; }
     .stat .num { font-size:2rem; font-weight:700; }
     .stat .lbl { color:#888; font-size:0.78rem; margin-top:4px; }
+
     .lang-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
     .lang-tag { background:#1a1d27; border:1px solid #2a2d3e; border-radius:8px; padding:6px 14px; font-size:0.82rem; }
     .lang-tag span { color:#4f8ef7; font-weight:600; margin-left:4px; }
+
     .file-card { background:#1a1d27; border:1px solid #2a2d3e; border-radius:12px; padding:18px; margin-bottom:10px; }
     .file-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
     .file-left .name { font-weight:600; font-size:0.95rem; }
@@ -65,42 +56,51 @@
     .risk-bar-wrap { margin-top:8px; width:220px; background:#0f1117; border-radius:6px; height:5px; overflow:hidden; }
     .risk-bar { height:100%; border-radius:6px; }
     .file-right { display:flex; align-items:center; gap:10px; }
+
     .badge { padding:4px 12px; border-radius:20px; font-size:0.78rem; font-weight:600; }
     .badge.defective { background:#2a1a1a; color:#f77; border:1px solid #f774; }
     .badge.clean { background:#1a2a1a; color:#7f7; border:1px solid #7f74; }
     .risk-pct { color:#888; font-size:0.82rem; }
+    .votes-badge { color:#888; font-size:0.78rem; background:#0f1117; border:1px solid #2a2d3e; border-radius:20px; padding:3px 10px; }
+
     .chevron { transition:transform .3s; font-size:0.8rem; color:#555; }
     .chevron.open { transform:rotate(180deg); }
+
     .file-details { display:none; margin-top:14px; border-top:1px solid #2a2d3e; padding-top:14px; }
     .file-details.open { display:block; }
+
     .agree-banner { text-align:center; padding:8px; border-radius:8px; font-size:0.82rem; margin-bottom:12px; }
     .agree-defect { background:#2a1a1a; color:#f77; }
     .agree-clean  { background:#1a2a1a; color:#7f7; }
     .disagree     { background:#2a2a1a; color:#fa7; }
-    .models-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
-    .model-box { background:#0f1117; border-radius:8px; padding:12px; text-align:center; }
-    .model-box .verdict { font-size:1.05rem; font-weight:700; margin:4px 0; }
-    .model-box .conf { color:#888; font-size:0.78rem; }
+
+    /* 5 model cards grid */
+    .models-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:12px; }
+    .model-box { background:#0f1117; border-radius:8px; padding:10px 6px; text-align:center; }
+    .model-box .model-name { color:#888; font-size:0.68rem; margin-bottom:4px; line-height:1.3; }
+    .model-box .verdict { font-size:0.9rem; font-weight:700; margin:4px 0; }
+    .model-box .conf { color:#888; font-size:0.7rem; }
+
     .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
     .metric-item { background:#0f1117; border-radius:8px; padding:10px 12px; }
     .metric-item .mk { color:#888; font-size:0.72rem; }
     .metric-item .mv { font-size:0.95rem; font-weight:600; margin-top:2px; }
+
     #loader { display:none; text-align:center; padding:40px; color:#888; }
     #results { display:none; }
     .progress { width:100%; background:#2a2d3e; border-radius:6px; height:6px; margin-top:12px; overflow:hidden; }
     .progress-bar { height:100%; background:#4f8ef7; border-radius:6px; animation:prog 2s ease-in-out infinite; }
     @keyframes prog { 0%{width:0%} 50%{width:70%} 100%{width:100%} }
 
-    /* Contribution toast */
-    .toast {
-      position:fixed; bottom:24px; right:24px; background:#1a1d27;
-      border:1px solid #2a2d3e; border-radius:12px; padding:14px 18px;
-      font-size:0.85rem; color:#e0e0e0; max-width:300px;
-      transform:translateY(100px); opacity:0;
-      transition:transform .4s ease, opacity .4s ease; z-index:999;
-    }
+    .toast { position:fixed; bottom:24px; right:24px; background:#1a1d27; border:1px solid #2a2d3e; border-radius:12px; padding:14px 18px; font-size:0.85rem; color:#e0e0e0; max-width:300px; transform:translateY(100px); opacity:0; transition:transform .4s ease, opacity .4s ease; z-index:999; }
     .toast.show { transform:translateY(0); opacity:1; }
     .toast strong { color:#7f7; }
+
+    /* Responsive — stack model cards on small screens */
+    @media (max-width: 600px) {
+      .models-grid { grid-template-columns:repeat(3,1fr); }
+      .summary { grid-template-columns:repeat(2,1fr); }
+    }
   </style>
 </head>
 <body>
@@ -215,10 +215,7 @@ async function analyzeProject() {
     renderFiles(data.results);
     document.getElementById('results').style.display = 'block';
 
-    // Show contribution toast
     showToast(data.summary.total_files);
-
-    // Refresh the counter after a short delay
     setTimeout(refreshCounter, 2000);
 
   } catch(e) {
@@ -239,8 +236,7 @@ function refreshCounter() {
   fetch('/dataset-stats')
     .then(r => r.json())
     .then(d => {
-      document.getElementById('rowCount').textContent =
-        d.rows.toLocaleString();
+      document.getElementById('rowCount').textContent = d.rows.toLocaleString();
     })
     .catch(() => {});
 }
@@ -264,15 +260,35 @@ function renderLangBar(counts) {
 function renderFiles(results) {
   const list = document.getElementById('fileList');
   list.innerHTML = '';
+
   results.forEach((r, i) => {
-    const isDef  = r.rf_pred === 1;
+    const isDef  = r.is_defective;
     const color  = r.risk_score > 70 ? '#f77' : r.risk_score > 40 ? '#fa7' : '#7f7';
-    const agreeC = r.agree ? (isDef ? 'agree-defect' : 'agree-clean') : 'disagree';
+
+    // Agreement banner
+    const agreeC = r.agree
+      ? (isDef ? 'agree-defect' : 'agree-clean')
+      : 'disagree';
     const agreeT = r.agree
-      ? (isDef ? 'Both models agree — defect likely' : 'Both models agree — looks healthy')
-      : 'Models disagree — manual review recommended';
+      ? (isDef ? 'All 5 models agree — defect likely' : 'All 5 models agree — looks healthy')
+      : `${r.votes_defective}/5 models say at risk — manual review recommended`;
+
+    // All 5 model cards
+    const modelCards = Object.entries(r.models).map(([name, m]) => `
+      <div class="model-box">
+        <div class="model-name">${name}</div>
+        <div class="verdict" style="color:${m.pred===1?'#f77':'#7f7'}">
+          ${m.pred===1 ? '⚠ At risk' : '✓ Healthy'}
+        </div>
+        <div class="conf">${m.conf}%</div>
+      </div>`).join('');
+
+    // Metrics
     const metrics = Object.entries(r.metrics).map(([k,v]) =>
-      `<div class="metric-item"><div class="mk">${k}</div><div class="mv">${typeof v==='number'&&v%1!==0?v.toFixed(3):v}</div></div>`
+      `<div class="metric-item">
+        <div class="mk">${k}</div>
+        <div class="mv">${typeof v==='number'&&v%1!==0?v.toFixed(3):v}</div>
+      </div>`
     ).join('');
 
     const card = document.createElement('div');
@@ -289,23 +305,15 @@ function renderFiles(results) {
         </div>
         <div class="file-right">
           <span class="risk-pct">Risk: ${r.risk_score}%</span>
+          <span class="votes-badge">${r.votes_defective}/5 models</span>
           <span class="badge ${isDef?'defective':'clean'}">${isDef?'At risk':'Healthy'}</span>
           <span class="chevron" id="chev${i}">▼</span>
         </div>
       </div>
       <div class="file-details" id="det${i}">
         <div class="agree-banner ${agreeC}">${agreeT}</div>
-        <div class="models-row">
-          <div class="model-box">
-            <div style="color:#888;font-size:0.75rem">Random Forest</div>
-            <div class="verdict" style="color:${r.rf_pred===1?'#f77':'#7f7'}">${r.rf_pred===1?'At risk':'Healthy'}</div>
-            <div class="conf">${r.rf_conf}% confidence</div>
-          </div>
-          <div class="model-box">
-            <div style="color:#888;font-size:0.75rem">SVM</div>
-            <div class="verdict" style="color:${r.svm_pred===1?'#f77':'#7f7'}">${r.svm_pred===1?'At risk':'Healthy'}</div>
-            <div class="conf">${r.svm_conf}% confidence</div>
-          </div>
+        <div class="models-grid">
+          ${modelCards}
         </div>
         <div class="metrics-grid">${metrics}</div>
       </div>`;
