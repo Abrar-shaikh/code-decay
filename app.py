@@ -9,15 +9,6 @@ from data_collector import save_batch, get_dataset_stats
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
 
-# Load all 5 models
-rf_model  = joblib.load('saved_models/random_forest_model.pkl')
-svm_model = joblib.load('saved_models/svm_model.pkl')
-ada_model = joblib.load('saved_models/adaboost_model.pkl')
-gb_model  = joblib.load('saved_models/gradient_boost_model.pkl')
-xgb_model = joblib.load('saved_models/xgboost_model.pkl')
-scaler        = joblib.load('saved_models/scaler.pkl')
-feature_names = joblib.load('saved_models/feature_names.pkl')
-
 FEATURE_ORDER = [
     'lines_of_code', 'cyclomatic_complexity', 'num_functions', 'num_classes',
     'comment_density', 'code_churn', 'developer_experience_years',
@@ -28,25 +19,34 @@ FEATURE_ORDER = [
     'security_vulnerabilities', 'performance_issues'
 ]
 
+# ── Lazy model loading ────────────────────────────────────────────────────────
+# Models are loaded once on first request, not at startup
+# This prevents Render free tier from timing out during boot
+_models = {}
+
+def get_models():
+    """Load models once and cache them."""
+    if not _models:
+        print("[app] Loading models...")
+        _models['rf']     = joblib.load('saved_models/random_forest_model.pkl')
+        _models['svm']    = joblib.load('saved_models/svm_model.pkl')
+        _models['ada']    = joblib.load('saved_models/adaboost_model.pkl')
+        _models['gb']     = joblib.load('saved_models/gradient_boost_model.pkl')
+        _models['xgb']    = joblib.load('saved_models/xgboost_model.pkl')
+        _models['scaler'] = joblib.load('saved_models/scaler.pkl')
+        print("[app] All models loaded!")
+    return _models
+
 
 def get_prediction(model, scaled):
-    """Get prediction and confidence from any model."""
     pred = int(model.predict(scaled)[0])
     conf = float(model.predict_proba(scaled)[0][pred] * 100)
     return pred, round(conf, 1)
 
 
 def calculate_risk(predictions):
-    """
-    Calculate overall risk score from all 5 models.
-    Weighted: GB and XGBoost get more weight as top performers.
-    """
     weights = {
-        'rf' : 0.15,
-        'svm': 0.15,
-        'ada': 0.10,
-        'gb' : 0.35,   # highest weight — 100% accuracy
-        'xgb': 0.25,   # second highest weight
+        'rf': 0.15, 'svm': 0.15, 'ada': 0.10, 'gb': 0.35, 'xgb': 0.25
     }
     score = 0
     for key, weight in weights.items():
@@ -56,9 +56,8 @@ def calculate_risk(predictions):
 
 
 def majority_vote(predictions):
-    """Returns True if majority of models say defective."""
     votes = sum(1 for pred, _ in predictions.values() if pred == 1)
-    return votes >= 3  # 3 or more out of 5 say defective
+    return votes >= 3
 
 
 @app.route('/')
@@ -83,6 +82,9 @@ def analyze():
     tmp_dir = None
 
     try:
+        # Load models on first request
+        models = get_models()
+
         zip_file.save(tmp_zip.name)
         tmp_zip.close()
 
@@ -102,20 +104,19 @@ def analyze():
             lang_counts[lang] = lang_counts.get(lang, 0) + 1
 
             vec    = [info.get(f, 0) for f in FEATURE_ORDER]
-            scaled = scaler.transform([vec])
+            scaled = models['scaler'].transform([vec])
 
-            # Get predictions from all 5 models
             predictions = {
-                'rf' : get_prediction(rf_model,  scaled),
-                'svm': get_prediction(svm_model, scaled),
-                'ada': get_prediction(ada_model, scaled),
-                'gb' : get_prediction(gb_model,  scaled),
-                'xgb': get_prediction(xgb_model, scaled),
+                'rf' : get_prediction(models['rf'],  scaled),
+                'svm': get_prediction(models['svm'], scaled),
+                'ada': get_prediction(models['ada'], scaled),
+                'gb' : get_prediction(models['gb'],  scaled),
+                'xgb': get_prediction(models['xgb'], scaled),
             }
 
-            risk        = calculate_risk(predictions)
+            risk         = calculate_risk(predictions)
             is_defective = majority_vote(predictions)
-            votes_defective = sum(
+            votes_def    = sum(
                 1 for pred, _ in predictions.values() if pred == 1)
 
             display_path = info['filepath'].replace(
@@ -126,15 +127,15 @@ def analyze():
                 'filepath'       : display_path,
                 'language'       : lang,
                 'is_defective'   : is_defective,
-                'votes_defective': votes_defective,
+                'votes_defective': votes_def,
                 'risk_score'     : risk,
-                'agree'          : votes_defective == 5 or votes_defective == 0,
+                'agree'          : votes_def == 5 or votes_def == 0,
                 'models': {
-                    'Random Forest'     : {'pred': predictions['rf'][0],  'conf': predictions['rf'][1]},
-                    'SVM'               : {'pred': predictions['svm'][0], 'conf': predictions['svm'][1]},
-                    'AdaBoost'          : {'pred': predictions['ada'][0], 'conf': predictions['ada'][1]},
-                    'Gradient Boosting' : {'pred': predictions['gb'][0],  'conf': predictions['gb'][1]},
-                    'XGBoost'           : {'pred': predictions['xgb'][0], 'conf': predictions['xgb'][1]},
+                    'Random Forest'    : {'pred': predictions['rf'][0],  'conf': predictions['rf'][1]},
+                    'SVM'              : {'pred': predictions['svm'][0], 'conf': predictions['svm'][1]},
+                    'AdaBoost'         : {'pred': predictions['ada'][0], 'conf': predictions['ada'][1]},
+                    'Gradient Boosting': {'pred': predictions['gb'][0],  'conf': predictions['gb'][1]},
+                    'XGBoost'          : {'pred': predictions['xgb'][0], 'conf': predictions['xgb'][1]},
                 },
                 'metrics': {
                     'Lines of code'        : info.get('lines_of_code', 0),
@@ -151,8 +152,6 @@ def analyze():
             })
 
         results.sort(key=lambda x: x['risk_score'], reverse=True)
-
-        # Save to community dataset in background
         save_batch(results, files_data)
 
         summary = {
@@ -167,6 +166,8 @@ def analyze():
         return jsonify({'results': results, 'summary': summary})
 
     except Exception as e:
+        import traceback
+        print("ERROR:", traceback.format_exc())
         return jsonify({'error': str(e)})
 
     finally:
