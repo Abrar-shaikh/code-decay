@@ -40,14 +40,37 @@ FUNCTION_PATTERNS = {
     'Kotlin': r'^\s*fun\s+\w+', 'Swift': r'^\s*func\s+\w+',
 }
 
+# ── FIX: Greatly expanded class patterns per language.
+# Old patterns missed: abstract/final/sealed classes, interfaces,
+# enums, structs, traits, protocols — all of which ARE class-like structures.
 CLASS_PATTERNS = {
-    'Python': r'^\s*class\s+\w+', 'JavaScript': r'^\s*class\s+\w+',
-    'TypeScript': r'^\s*class\s+\w+',
-    'Java': r'^\s*(public|private)?\s*class\s+\w+',
-    'C++': r'^\s*class\s+\w+',
-    'C#': r'^\s*(public|private)?\s*class\s+\w+',
-    'Ruby': r'^\s*class\s+\w+', 'Kotlin': r'^\s*(data\s+)?class\s+\w+',
-    'Swift': r'^\s*class\s+\w+', 'PHP': r'^\s*class\s+\w+',
+    'Python':     r'^\s*class\s+\w+',
+    'JavaScript': r'^\s*class\s+\w+',
+    'TypeScript': r'^\s*(?:export\s+)?(?:abstract\s+)?class\s+\w+'
+                  r'|^\s*(?:export\s+)?interface\s+\w+',
+    # Java: catches public/private/abstract/final + class/interface/enum
+    'Java':       r'^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*'
+                  r'(?:class|interface|enum)\s+\w+',
+    # C++: struct is a class with public-by-default members
+    'C++':        r'^\s*(?:class|struct)\s+\w+',
+    # C#: abstract/sealed/static/partial + class/interface/struct/enum
+    'C#':         r'^\s*(?:(?:public|private|protected|internal|abstract|sealed|static|partial)\s+)*'
+                  r'(?:class|interface|struct|enum)\s+\w+',
+    'Ruby':       r'^\s*class\s+\w+',
+    # Kotlin: data/sealed/abstract/open class + interface
+    'Kotlin':     r'^\s*(?:(?:data|sealed|abstract|open|inner)\s+)?class\s+\w+'
+                  r'|^\s*(?:fun\s+)?interface\s+\w+',
+    # Swift: class/struct/enum/protocol/actor are all type definitions
+    'Swift':      r'^\s*(?:class|struct|enum|protocol|actor)\s+\w+',
+    'PHP':        r'^\s*(?:(?:abstract|final)\s+)?class\s+\w+'
+                  r'|^\s*interface\s+\w+',
+    # Go uses structs — there are no classes
+    'Go':         r'^\s*type\s+\w+\s+struct',
+    # Rust: struct/enum/trait are all class-equivalents
+    'Rust':       r'^\s*(?:pub\s+)?(?:struct|enum|trait)\s+\w+',
+    # Scala: class/case class/object/trait
+    'Scala':      r'^\s*(?:case\s+)?class\s+\w+'
+                  r'|^\s*object\s+\w+|^\s*trait\s+\w+',
 }
 
 RISKY_PATTERNS = [
@@ -56,17 +79,146 @@ RISKY_PATTERNS = [
     'catch (Exception)', 'ignore', 'pass', 'delete ', 'free(', 'unsafe',
 ]
 
+# ── FIX: Expanded security patterns — 7 new real-world dangerous patterns added.
+# Root cause of showing 0: the original 12 patterns are rare in typical
+# Python Flask projects. These 7 additions cover the most common actual
+# vulnerabilities in web applications.
 SECURITY_PATTERNS = [
-    'eval(', 'exec(', 'os.system(', 'subprocess.call(',
-    'pickle.loads(', 'yaml.load(', '__import__(',
-    'Runtime.exec', 'ProcessBuilder', 'innerHTML',
-    'document.write', 'dangerouslySetInnerHTML',
+    # --- Original patterns ---
+    'eval(',                    # Arbitrary code execution
+    'exec(',                    # Arbitrary code execution
+    'os.system(',               # Shell command injection
+    'subprocess.call(',         # Process execution
+    'pickle.loads(',            # Unsafe deserialisation — can run arbitrary code
+    'yaml.load(',               # Use yaml.safe_load() instead
+    '__import__(',              # Dynamic module loading — can load anything
+    'Runtime.exec',             # Java: shell execution
+    'ProcessBuilder',           # Java: process spawning
+    'innerHTML',                # XSS via DOM — any assignment is a risk
+    'document.write',           # XSS via legacy DOM write
+    'dangerouslySetInnerHTML',  # React: intentional XSS bypass
+    # --- NEW patterns ---
+    'shell=True',               # subprocess(shell=True) → command injection
+    'verify=False',             # requests.get(verify=False) → SSL stripped
+    'hashlib.md5(',             # MD5 is cryptographically broken (collisions)
+    'hashlib.sha1(',            # SHA-1 is broken — use SHA-256 minimum
+    'subprocess.Popen(',        # Direct process spawning without validation
+    'os.popen(',                # Deprecated shell execution
+    'tempfile.mktemp(',         # Race condition between mktemp and open
 ]
 
 SKIP_DIRS = {
     '__pycache__', '.git', 'venv', 'env', 'node_modules',
     '.venv', 'dist', 'build', '.idea', '.vscode', 'vendor',
     '.ipynb_checkpoints'
+}
+
+# ── FIX: Language-specific test patterns.
+#
+# ROOT CAUSE of test_coverage always being 0:
+#   The original regex was:
+#       r'\b(assert|test_|_test|expect|should|describe|it\()\b'
+#
+#   \b is a word-boundary — it fires between a word-char (\w = [a-zA-Z0-9_])
+#   and a non-word char. Since underscore (_) IS a word character:
+#
+#   • \btest_\b  needs a NON-word char right after '_'.
+#     In "def test_login():", the char after '_' is 'l' → word char → NO MATCH.
+#     Every Python test function was silently skipped.
+#
+#   • \b_test\b  needs a NON-word char right before '_'.
+#     In "module_test", 'e' before '_' → word char → NO MATCH.
+#
+#   FIX: Replace with language-specific patterns that explicitly match
+#   real test idioms for each language, with no \b around underscores.
+TEST_PATTERNS = {
+    # Python: def test_*, class Test*, assert statement, unittest, @pytest
+    'Python':     r'(?:def\s+test_\w+'
+                  r'|class\s+Test\w+'
+                  r'|\bassert\s+'
+                  r'|\bunittest\b'
+                  r'|@pytest)',
+
+    # JavaScript / TypeScript: describe(), it(), test(), expect(), jest, mocha
+    'JavaScript': r'(?:describe\s*\('
+                  r'|(?<![a-zA-Z])it\s*\('
+                  r'|(?<![a-zA-Z])test\s*\('
+                  r'|expect\s*\('
+                  r'|\.toBe\s*\('
+                  r'|beforeEach\s*\('
+                  r'|afterEach\s*\('
+                  r'|jest\.'
+                  r'|mocha)',
+    'TypeScript': r'(?:describe\s*\('
+                  r'|(?<![a-zA-Z])it\s*\('
+                  r'|(?<![a-zA-Z])test\s*\('
+                  r'|expect\s*\('
+                  r'|\.toBe\s*\('
+                  r'|beforeEach\s*\('
+                  r'|afterEach\s*\()',
+
+    # Java: JUnit 4 + 5 annotations, assertion methods
+    'Java':    r'(?:@Test\b'
+               r'|assertEquals\s*\('
+               r'|assertTrue\s*\('
+               r'|assertFalse\s*\('
+               r'|assertThat\s*\('
+               r'|@Before\b|@After\b'
+               r'|@BeforeEach\b|@AfterEach\b)',
+
+    # Kotlin: JUnit + Kotest
+    'Kotlin':  r'(?:@Test\b'
+               r'|assertEquals\s*\('
+               r'|assertTrue\s*\('
+               r'|shouldBe\b'
+               r'|kotest)',
+
+    # C#: xUnit, NUnit, MSTest
+    'C#':   r'(?:\[Test\]|\[TestMethod\]|\[Fact\]|\[Theory\]'
+            r'|Assert\.'
+            r'|NUnit|xUnit)',
+
+    # Ruby: RSpec, Minitest
+    'Ruby': r'(?:describe\s+'
+            r'|(?:^|\s)it\s+["\']'
+            r'|expect\s*\('
+            r'|RSpec'
+            r'|\bshould\b'
+            r'|assert_equal)',
+
+    # Go: test functions must start with Test, use *testing.T
+    'Go':   r'(?:func\s+Test\w+\s*\('
+            r'|\bt\.Error\b|\bt\.Fatal\b'
+            r'|\bt\.Log\b'
+            r'|testing\.T)',
+
+    # PHP: PHPUnit
+    'PHP':  r'(?:assertEquals\s*\('
+            r'|assertTrue\s*\('
+            r'|@test\b'
+            r'|PHPUnit'
+            r'|assertSame\s*\()',
+
+    # Rust: #[test], assert_eq!, assert!, test module
+    'Rust': r'(?:#\[test\]'
+            r'|assert_eq!\s*\('
+            r'|assert!\s*\('
+            r'|#\[cfg\(test\)\])',
+
+    # Swift: XCTest framework
+    'Swift': r'(?:XCTest'
+             r'|func\s+test\w+'
+             r'|XCTAssert'
+             r'|XCTEqual'
+             r'|setUp\(\)|tearDown\(\))',
+
+    # Scala: ScalaTest / specs2
+    'Scala': r'(?:extends\s+(?:FlatSpec|WordSpec|FunSuite|Spec)'
+             r'|\bshouldBe\b'
+             r'|\bassert\s*\()',
+
+    # Fallback for Shell, SQL, HTML, CSS etc.
+    'default': r'(?:\bassert\b|def\s+test_\w+|class\s+Test\w+)',
 }
 
 
@@ -164,7 +316,7 @@ def analyze_file(filepath):
     metrics['static_analysis_warnings'] = sum(
         source.count(p) for p in RISKY_PATTERNS)
 
-    # Security vulnerabilities
+    # Security vulnerabilities — uses expanded SECURITY_PATTERNS
     metrics['security_vulnerabilities'] = sum(
         source.count(p) for p in SECURITY_PATTERNS)
 
@@ -173,11 +325,11 @@ def analyze_file(filepath):
         r'\b(sleep|wait|delay|blocking|synchronized|lock)\b', source))
     metrics['performance_issues'] = perf
 
-    # Test coverage estimate
-    test_lines = len(re.findall(
-        r'\b(assert|test_|_test|expect|should|describe|it\()\b', source))
-    metrics['test_coverage'] = round(
-        min(test_lines / total_lines * 5, 1.0), 4)
+    # ── FIX: Language-specific test coverage using correct patterns.
+    # Falls back to 'default' for unmapped languages (HTML, CSS, SQL, etc.)
+    test_pat = TEST_PATTERNS.get(lang, TEST_PATTERNS['default'])
+    test_hits = len(re.findall(test_pat, source, re.MULTILINE))
+    metrics['test_coverage'] = round(min(test_hits / total_lines * 5, 1.0), 4)
 
     # AST graph metrics (Python only)
     if lang == 'Python':

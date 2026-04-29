@@ -44,9 +44,7 @@ def _get_sheet():
         return None
 
     try:
-        # Get credentials from environment variable
         import json
-        # Try secret file first (Render), then environment variable (local)
         secret_path = 'google_credentials.json'
         if os.path.exists(secret_path):
             with open(secret_path, 'r') as f:
@@ -56,19 +54,21 @@ def _get_sheet():
         else:
             print("[data_collector] No Google credentials found")
             return None
-        scopes     = [
+
+        scopes = [
             'https://spreadsheets.google.com/feeds',
             'https://www.googleapis.com/auth/drive'
         ]
         creds  = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         client = gspread.authorize(creds)
 
-        sheet_name = os.environ.get('SHEET_NAME', 'coderot_community_dataset')
+        sheet_name  = os.environ.get('SHEET_NAME', 'coderot_community_dataset')
         spreadsheet = client.open(sheet_name)
         worksheet   = spreadsheet.sheet1
 
-        # Add header row if sheet is empty
-        if worksheet.row_count == 0 or not worksheet.row_values(1):
+        # ✅ FIXED: Use get_all_values() to check if sheet is truly empty
+        existing = worksheet.get_all_values()
+        if not existing:
             worksheet.append_row(HEADER)
 
         _sheet = worksheet
@@ -113,7 +113,7 @@ def _save_to_csv_fallback(rows):
     try:
         import csv
         os.makedirs('collected_data', exist_ok=True)
-        path = 'collected_data/community_dataset.csv'
+        path        = 'collected_data/community_dataset.csv'
         file_exists = os.path.exists(path)
         with _lock:
             with open(path, 'a', newline='', encoding='utf-8') as f:
@@ -126,14 +126,23 @@ def _save_to_csv_fallback(rows):
 
 
 def save_batch(results_list, files_data):
-    """Save all metrics from one session — runs in background thread."""
+    """Save all metrics from one session — runs in background thread.
+
+    BUG FIX: Previously accessed result['rf_pred'] and result['svm_pred']
+    which don't exist in the result dict. The actual predictions are nested
+    under result['models']['Random Forest']['pred'] etc.
+    """
     def _save():
         rows = []
         for result, info in zip(results_list, files_data):
+            # ✅ FIXED: correct key paths into the result dict
+            rf_pred  = result.get('models', {}).get('Random Forest', {}).get('pred', 0)
+            svm_pred = result.get('models', {}).get('SVM', {}).get('pred', 0)
+
             row = _build_row(
                 info,
-                result['rf_pred'],
-                result['svm_pred'],
+                rf_pred,
+                svm_pred,
                 result['risk_score']
             )
             rows.append(row)
@@ -141,7 +150,6 @@ def save_batch(results_list, files_data):
         if not rows:
             return
 
-        # Try Google Sheets first, fall back to CSV
         sheet = _get_sheet()
         if sheet:
             _save_to_sheet(rows)
@@ -153,12 +161,18 @@ def save_batch(results_list, files_data):
 
 
 def get_dataset_stats():
-    """Return how many rows have been collected."""
+    """Return how many rows have been collected.
+
+    BUG FIX: Previously used sheet.row_count which returns the total
+    allocated rows in the spreadsheet (default 1000), not rows with data.
+    Now uses get_all_values() which only returns rows that contain content.
+    """
     try:
         sheet = _get_sheet()
         if sheet:
-            # Subtract 1 for header row
-            count = max(sheet.row_count - 1, 0)
+            # ✅ FIXED: count only rows that actually have data
+            all_rows = sheet.get_all_values()
+            count    = max(len(all_rows) - 1, 0)   # minus header row
             return {'rows': count, 'source': 'sheets'}
     except:
         pass

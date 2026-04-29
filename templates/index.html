@@ -5,162 +5,385 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Code Decay Detector</title>
   <style>
+    :root {
+      /* ── Foreground / text ── */
+      --cream:   #2C2420;   /* primary body text — dark warm brown on white */
+      --brown:   #4A3F3A;   /* headings, names — slightly lighter */
+      --muted:   #9A8880;   /* secondary text, labels */
+
+      /* ── Accent colours (unchanged) ── */
+      --terra:   #B8845A;
+      --sage:    #4E6960;
+      --risk:    #A84848;
+      --warn:    #8F6A30;
+
+      /* ── Page chrome — white base ── */
+      --base:    #FFFFFF;   /* page background */
+      --surface: #F7F3F0;   /* subtle off-white for inset areas */
+      --card:    #FFFFFF;   /* card background */
+      --border:  #E4DAD5;   /* borders — warm light grey */
+
+      /* ── Tinted backgrounds for accents ── */
+      --terra-dim: rgba(184,132,90,0.09);
+      --sage-dim:  rgba(78,105,96,0.09);
+      --risk-dim:  rgba(168,72,72,0.08);
+      --warn-dim:  rgba(143,106,48,0.09);
+    }
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Segoe UI',sans-serif; background:#0f1117; color:#e0e0e0; min-height:100vh; padding:30px 20px; }
-    .container { max-width:960px; margin:0 auto; }
-    header { text-align:center; margin-bottom:32px; }
-    header h1 { font-size:2.2rem; color:#fff; }
-    header h1 span { color:#4f8ef7; }
-    header p { color:#888; margin-top:8px; font-size:0.95rem; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--base); color:var(--cream); min-height:100vh; padding:36px 20px; line-height:1.5; }
+    .container { max-width:980px; margin:0 auto; }
+    code { font-family:'Consolas','Courier New',monospace; background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:0.85em; color:var(--terra); }
 
-    .counter-banner { display:flex; align-items:center; justify-content:center; gap:10px; background:#1a1d27; border:1px solid #2a2d3e; border-radius:10px; padding:10px 20px; margin-bottom:24px; }
-    .counter-dot { width:8px; height:8px; border-radius:50%; background:#4f8ef7; animation:pulse 2s ease-in-out infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-    .counter-text { color:#888; font-size:0.88rem; }
-    .counter-text strong { color:#4f8ef7; font-size:1rem; }
+    /* Header */
+    header { text-align:center; margin-bottom:36px; }
+    .eyebrow { font-size:0.7rem; letter-spacing:2px; text-transform:uppercase; color:var(--terra); margin-bottom:10px; }
+    header h1 { font-size:2.4rem; font-weight:700; color:var(--cream); letter-spacing:-0.5px; }
+    header h1 span { color:var(--terra); }
+    header p { color:var(--muted); margin-top:10px; font-size:0.92rem; }
+    .divider { width:48px; height:2px; background:var(--terra); margin:16px auto 0; border-radius:2px; opacity:0.55; }
 
-    .card { background:#1a1d27; border:1px solid #2a2d3e; border-radius:16px; padding:24px; margin-bottom:20px; }
-    .card h2 { font-size:0.82rem; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:16px; }
-    .upload-zone { border:2px dashed #2a2d3e; border-radius:12px; padding:40px; text-align:center; cursor:pointer; transition:border-color .2s; }
-    .upload-zone:hover, .upload-zone.drag { border-color:#4f8ef7; }
+    /* Counter */
+    .counter-banner { display:flex; align-items:center; justify-content:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:11px 20px; margin-bottom:24px; }
+    .counter-dot { width:7px; height:7px; border-radius:50%; background:var(--sage); animation:pulse 2.4s ease-in-out infinite; flex-shrink:0; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.75)} }
+    .counter-text { color:var(--muted); font-size:0.86rem; }
+    .counter-text strong { color:var(--terra); font-weight:700; }
+
+    /* Card */
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:26px; margin-bottom:20px; box-shadow:0 1px 4px rgba(92,74,68,0.07),0 4px 16px rgba(92,74,68,0.05); }
+    .card-label { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+    .card-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* Upload */
+    .upload-zone { border:2px dashed var(--border); border-radius:12px; padding:42px 24px; text-align:center; cursor:pointer; transition:border-color .25s,background .25s; }
+    .upload-zone:hover,.upload-zone.drag { border-color:var(--terra); background:var(--terra-dim); }
     .upload-zone input { display:none; }
-    .upload-zone .icon { font-size:2.5rem; margin-bottom:12px; }
-    .upload-zone .hint { color:#555; font-size:0.82rem; margin-top:8px; }
-    .upload-zone .chosen { color:#4f8ef7; font-weight:600; margin-top:8px; font-size:0.9rem; }
+    .upload-icon { font-size:2.4rem; margin-bottom:14px; display:block; }
+    .upload-main { font-size:0.92rem; color:var(--cream); font-weight:500; }
+    .upload-hint { color:var(--muted); font-size:0.79rem; margin-top:8px; }
+    .upload-chosen { color:var(--terra); font-weight:600; margin-top:10px; font-size:0.89rem; }
 
-    .privacy-note { display:flex; align-items:center; gap:8px; margin-top:14px; background:#0f1117; border:1px solid #2a2d3e; border-radius:8px; padding:10px 14px; }
-    .privacy-note .shield { font-size:1rem; }
-    .privacy-note p { font-size:0.8rem; color:#555; }
-    .privacy-note p strong { color:#7f7; }
+    .privacy-note { display:flex; align-items:flex-start; gap:10px; margin-top:14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:11px 14px; }
+    .privacy-note p { font-size:0.78rem; color:var(--muted); }
+    .privacy-note p strong { color:var(--sage); }
 
-    .lang-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-    .pill { background:#0f1117; border:1px solid #2a2d3e; border-radius:20px; padding:3px 10px; font-size:0.75rem; color:#888; }
-    .btn { width:100%; padding:13px; border:none; border-radius:10px; font-size:1rem; font-weight:600; cursor:pointer; background:#4f8ef7; color:#fff; transition:opacity .2s; margin-top:16px; }
-    .btn:hover { opacity:.85; }
-    .btn:disabled { opacity:.4; cursor:not-allowed; }
+    .lang-section-label { font-size:0.74rem; color:var(--muted); margin-top:16px; margin-bottom:8px; }
+    .lang-pills { display:flex; flex-wrap:wrap; gap:6px; }
+    .pill { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:0.72rem; color:var(--muted); }
 
-    .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px; }
-    .stat { background:#1a1d27; border:1px solid #2a2d3e; border-radius:12px; padding:18px; text-align:center; }
+    .btn { width:100%; padding:14px; border:none; border-radius:10px; font-size:0.95rem; font-weight:600; cursor:pointer; background:var(--terra); color:#fff; letter-spacing:0.3px; transition:opacity .2s,transform .1s; margin-top:18px; }
+    .btn:hover { opacity:0.88; }
+    .btn:active { transform:scale(0.99); }
+    .btn:disabled { opacity:0.35; cursor:not-allowed; transform:none; }
+
+    /* ── Real-time loader ── */
+    #loader { display:none; background:var(--card); border:1px solid var(--border); border-radius:14px; padding:44px 32px; text-align:center; margin-bottom:20px; box-shadow:0 1px 4px rgba(92,74,68,0.07),0 4px 16px rgba(92,74,68,0.05); }
+    .spinner-wrap { display:flex; justify-content:center; margin-bottom:26px; }
+    .spinner { width:54px; height:54px; border-radius:50%; border:3px solid var(--border); border-top-color:var(--terra); animation:spin 0.8s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .loader-title { font-size:1rem; font-weight:600; color:var(--cream); margin-bottom:6px; }
+    .loader-timer { font-size:0.81rem; color:var(--muted); margin-bottom:30px; font-variant-numeric:tabular-nums; }
+    .loader-timer span { color:var(--terra); font-weight:600; }
+    .loader-steps { display:flex; flex-direction:column; gap:9px; max-width:360px; margin:0 auto; }
+    .lstep { display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:9px; text-align:left; transition:border-color .4s,background .4s; }
+    .lstep.active { border-color:var(--terra); background:var(--terra-dim); }
+    .lstep.done   { border-color:var(--sage);  background:var(--sage-dim); }
+    .lstep-icon { font-size:1rem; width:22px; text-align:center; flex-shrink:0; }
+    .lstep-label { font-size:0.81rem; color:var(--muted); }
+    .lstep.active .lstep-label { color:var(--terra); font-weight:600; }
+    .lstep.done   .lstep-label { color:var(--sage); }
+
+    /* Results */
+    #results { display:none; }
+    #results.visible { display:block; animation:fadeUp .45s ease both; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+    /* Summary */
+    .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    .stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; box-shadow:0 1px 4px rgba(92,74,68,0.07); }
     .stat .num { font-size:2rem; font-weight:700; }
-    .stat .lbl { color:#888; font-size:0.78rem; margin-top:4px; }
+    .stat .lbl { color:var(--muted); font-size:0.74rem; margin-top:5px; }
+    .lang-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; align-items:center; }
+    .lang-bar-label { font-size:0.75rem; color:var(--muted); }
+    .lang-tag { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:5px 12px; font-size:0.79rem; color:var(--cream); }
+    .lang-tag span { color:var(--terra); font-weight:600; margin-left:4px; }
 
-    .lang-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
-    .lang-tag { background:#1a1d27; border:1px solid #2a2d3e; border-radius:8px; padding:6px 14px; font-size:0.82rem; }
-    .lang-tag span { color:#4f8ef7; font-weight:600; margin-left:4px; }
+    /* Guide */
+    .guide-card { background:var(--card); border:1px solid var(--border); border-radius:14px; margin-bottom:20px; overflow:hidden; box-shadow:0 1px 4px rgba(92,74,68,0.07),0 4px 16px rgba(92,74,68,0.05); }
+    .guide-toggle { width:100%; background:none; border:none; color:var(--cream); display:flex; align-items:center; justify-content:space-between; padding:18px 26px; cursor:pointer; font-size:0.88rem; font-weight:600; transition:background .2s; }
+    .guide-toggle:hover { background:rgba(92,79,74,0.04); }
+    .guide-toggle-left { display:flex; align-items:center; gap:10px; }
+    .guide-toggle-chevron { font-size:0.74rem; color:var(--muted); transition:transform .3s; }
+    .guide-toggle-chevron.open { transform:rotate(180deg); }
+    .guide-body { display:none; padding:0 26px 26px; }
+    .guide-body.open { display:block; }
+    .guide-intro { font-size:0.81rem; color:var(--muted); line-height:1.7; border-bottom:1px solid var(--border); padding-bottom:18px; margin-bottom:20px; }
+    .guide-intro strong { color:var(--cream); }
+    .guide-section-title { font-size:0.67rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:18px 0 10px; }
 
-    .file-card { background:#1a1d27; border:1px solid #2a2d3e; border-radius:12px; padding:18px; margin-bottom:10px; }
-    .file-header { display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
-    .file-left .name { font-weight:600; font-size:0.95rem; }
-    .file-left .path { color:#555; font-size:0.75rem; margin-top:2px; }
-    .file-left .lang-badge { display:inline-block; background:#1a2535; color:#4f8ef7; border:1px solid #1e3a5a; border-radius:4px; font-size:0.7rem; padding:1px 7px; margin-top:4px; }
-    .risk-bar-wrap { margin-top:8px; width:220px; background:#0f1117; border-radius:6px; height:5px; overflow:hidden; }
+    .formula-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin-bottom:20px; }
+    .formula-title { font-size:0.67rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px; }
+    .formula-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+    .formula-chip { display:flex; align-items:center; gap:6px; background:var(--card); border:1px solid var(--border); border-radius:7px; padding:6px 11px; font-size:0.77rem; }
+    .model-w { color:var(--terra); font-weight:700; font-size:0.84rem; }
+    .model-n { color:var(--muted); }
+    .formula-plus { color:var(--muted); font-size:0.84rem; }
+    .verdict-rule { font-size:0.78rem; color:var(--muted); line-height:1.6; border-top:1px solid var(--border); padding-top:10px; margin-top:6px; }
+    .verdict-rule strong { color:var(--warn); }
+
+    .scale-legend { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+    .scale-chip { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:0.78rem; color:var(--muted); }
+    .scale-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+    .tag { display:inline-block; font-size:0.62rem; font-weight:600; border-radius:4px; padding:1px 6px; margin-left:6px; vertical-align:middle; }
+    .tag-good { background:var(--sage-dim);  color:var(--sage);  border:1px solid rgba(92,118,109,0.3); }
+    .tag-warn { background:var(--warn-dim);  color:var(--warn);  border:1px solid rgba(201,164,107,0.3); }
+    .tag-bad  { background:var(--risk-dim);  color:var(--risk);  border:1px solid rgba(184,95,95,0.3); }
+    .tag-info { background:var(--terra-dim); color:var(--terra); border:1px solid rgba(201,153,107,0.3); }
+
+    .metric-rows { display:flex; flex-direction:column; gap:8px; }
+    .metric-row { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:13px 16px; display:grid; grid-template-columns:210px 1fr; gap:14px; align-items:start; }
+    .metric-row-name { font-size:0.81rem; font-weight:600; color:var(--cream); }
+    .metric-row-body { font-size:0.78rem; color:var(--muted); line-height:1.65; }
+    .baseline { margin-top:7px; display:flex; gap:6px; flex-wrap:wrap; }
+    .bl-chip { font-size:0.69rem; border-radius:5px; padding:2px 8px; font-weight:600; }
+    .bl-green  { background:var(--sage-dim);  color:var(--sage);  border:1px solid rgba(92,118,109,0.28); }
+    .bl-orange { background:var(--warn-dim);  color:var(--warn);  border:1px solid rgba(201,164,107,0.28); }
+    .bl-red    { background:var(--risk-dim);  color:var(--risk);  border:1px solid rgba(184,95,95,0.28); }
+
+    .dataset-note { display:flex; gap:12px; align-items:flex-start; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-top:20px; font-size:0.78rem; color:var(--muted); line-height:1.65; }
+    .dataset-note .dn-icon { font-size:1.1rem; flex-shrink:0; }
+    .dataset-note strong { color:var(--cream); }
+
+    /* File cards */
+    .file-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:10px; transition:border-color .2s,box-shadow .2s; box-shadow:0 1px 4px rgba(92,74,68,0.07); }
+    .file-card:hover { border-color:#C9B9B0; box-shadow:0 4px 16px rgba(92,74,68,0.11); }
+    .file-header { display:flex; align-items:center; gap:12px; cursor:pointer; }
+    .file-left { flex:1; min-width:0; }
+    .fname { font-weight:600; font-size:0.93rem; color:var(--cream); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .fpath { color:var(--muted); font-size:0.72rem; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .lang-badge { display:inline-block; background:var(--terra-dim); color:var(--terra); border:1px solid rgba(201,153,107,0.28); border-radius:4px; font-size:0.67rem; padding:1px 7px; margin-top:5px; }
+    .risk-bar-wrap { margin-top:8px; width:180px; background:var(--surface); border-radius:6px; height:4px; overflow:hidden; }
     .risk-bar { height:100%; border-radius:6px; }
-    .file-right { display:flex; align-items:center; gap:10px; }
-
-    .badge { padding:4px 12px; border-radius:20px; font-size:0.78rem; font-weight:600; }
-    .badge.defective { background:#2a1a1a; color:#f77; border:1px solid #f774; }
-    .badge.clean { background:#1a2a1a; color:#7f7; border:1px solid #7f74; }
-    .risk-pct { color:#888; font-size:0.82rem; }
-    .votes-badge { color:#888; font-size:0.78rem; background:#0f1117; border:1px solid #2a2d3e; border-radius:20px; padding:3px 10px; }
-
-    .chevron { transition:transform .3s; font-size:0.8rem; color:#555; }
+    .file-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .badge { padding:4px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; }
+    .badge.defective { background:var(--risk-dim); color:var(--risk); border:1px solid rgba(184,95,95,0.28); }
+    .badge.clean     { background:var(--sage-dim);  color:var(--sage); border:1px solid rgba(92,118,109,0.28); }
+    .risk-pct   { color:var(--muted); font-size:0.79rem; white-space:nowrap; }
+    .votes-badge { color:var(--muted); font-size:0.74rem; background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:3px 10px; white-space:nowrap; }
+    .chevron { transition:transform .3s; font-size:0.74rem; color:var(--muted); }
     .chevron.open { transform:rotate(180deg); }
 
-    .file-details { display:none; margin-top:14px; border-top:1px solid #2a2d3e; padding-top:14px; }
+    .file-details { display:none; margin-top:16px; border-top:1px solid var(--border); padding-top:16px; }
     .file-details.open { display:block; }
+    .agree-banner { text-align:center; padding:9px; border-radius:9px; font-size:0.8rem; margin-bottom:16px; font-weight:500; }
+    .agree-defect { background:var(--risk-dim); color:var(--risk); border:1px solid rgba(184,95,95,0.2); }
+    .agree-clean  { background:var(--sage-dim);  color:var(--sage); border:1px solid rgba(92,118,109,0.2); }
+    .disagree     { background:var(--warn-dim);  color:var(--warn); border:1px solid rgba(201,164,107,0.2); }
 
-    .agree-banner { text-align:center; padding:8px; border-radius:8px; font-size:0.82rem; margin-bottom:12px; }
-    .agree-defect { background:#2a1a1a; color:#f77; }
-    .agree-clean  { background:#1a2a1a; color:#7f7; }
-    .disagree     { background:#2a2a1a; color:#fa7; }
+    .section-label { font-size:0.69rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.9px; margin-bottom:10px; margin-top:16px; }
+    .section-label:first-of-type { margin-top:0; }
 
-    /* 5 model cards grid */
-    .models-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:12px; }
-    .model-box { background:#0f1117; border-radius:8px; padding:10px 6px; text-align:center; }
-    .model-box .model-name { color:#888; font-size:0.68rem; margin-bottom:4px; line-height:1.3; }
-    .model-box .verdict { font-size:0.9rem; font-weight:700; margin:4px 0; }
-    .model-box .conf { color:#888; font-size:0.7rem; }
+    .models-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:6px; }
+    .model-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 8px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:5px; }
+    .model-name { color:var(--muted); font-size:0.67rem; line-height:1.3; min-height:2em; display:flex; align-items:center; justify-content:center; }
+    .model-verdict { font-size:0.81rem; font-weight:700; }
+    .conf-bar-wrap { width:100%; background:var(--border); border-radius:4px; height:3px; overflow:hidden; }
+    .conf-bar { height:100%; border-radius:4px; }
+    .conf-pct { color:var(--muted); font-size:0.64rem; }
 
-    .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
-    .metric-item { background:#0f1117; border-radius:8px; padding:10px 12px; }
-    .metric-item .mk { color:#888; font-size:0.72rem; }
-    .metric-item .mv { font-size:0.95rem; font-weight:600; margin-top:2px; }
+    .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(154px,1fr)); gap:8px; }
+    .metric-item { background:var(--surface); border:1px solid transparent; border-radius:9px; padding:10px 12px; position:relative; cursor:default; transition:border-color .2s; }
+    .metric-item:hover { border-color:var(--border); }
+    .metric-mk { color:var(--muted); font-size:0.69rem; display:flex; align-items:center; gap:5px; }
+    .info-icon { width:13px; height:13px; border-radius:50%; background:var(--terra-dim); border:1px solid rgba(201,153,107,0.28); color:var(--terra); font-size:0.51rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; cursor:help; }
+    .metric-mv { font-size:0.92rem; font-weight:600; margin-top:3px; color:var(--cream); }
+    .metric-mv.val-good { color:var(--sage); }
+    .metric-mv.val-warn { color:var(--warn); }
+    .metric-mv.val-bad  { color:var(--risk); }
 
-    #loader { display:none; text-align:center; padding:40px; color:#888; }
-    #results { display:none; }
-    .progress { width:100%; background:#2a2d3e; border-radius:6px; height:6px; margin-top:12px; overflow:hidden; }
-    .progress-bar { height:100%; background:#4f8ef7; border-radius:6px; animation:prog 2s ease-in-out infinite; }
-    @keyframes prog { 0%{width:0%} 50%{width:70%} 100%{width:100%} }
+    .metric-tooltip { display:none; position:absolute; bottom:calc(100% + 9px); left:50%; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); border-radius:11px; padding:13px 15px; width:244px; z-index:200; box-shadow:0 8px 28px rgba(92,74,68,0.13); pointer-events:none; }
+    .metric-tooltip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:var(--border); }
+    .metric-item:hover .metric-tooltip { display:block; }
+    .tooltip-name { font-size:0.78rem; font-weight:700; color:var(--cream); margin-bottom:5px; }
+    .tooltip-desc { font-size:0.72rem; color:var(--muted); line-height:1.55; }
+    .tooltip-scale { margin-top:9px; display:flex; flex-direction:column; gap:4px; }
+    .tooltip-scale-row { display:flex; align-items:center; gap:7px; font-size:0.68rem; color:var(--muted); }
+    .ts-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
 
-    .toast { position:fixed; bottom:24px; right:24px; background:#1a1d27; border:1px solid #2a2d3e; border-radius:12px; padding:14px 18px; font-size:0.85rem; color:#e0e0e0; max-width:300px; transform:translateY(100px); opacity:0; transition:transform .4s ease, opacity .4s ease; z-index:999; }
+    .fixes-panel { margin-top:16px; border-top:1px solid var(--border); padding-top:16px; }
+    .fix-item { border-radius:10px; padding:14px 16px; margin-bottom:9px; border-left:3px solid transparent; }
+    .fix-item.critical { background:var(--risk-dim); border-left-color:var(--risk); }
+    .fix-item.warning  { background:var(--warn-dim); border-left-color:var(--warn); }
+    .fix-item.info     { background:var(--terra-dim); border-left-color:var(--terra); }
+    .fix-header { display:flex; align-items:center; gap:8px; margin-bottom:9px; flex-wrap:wrap; }
+    .fix-sev-badge { font-size:0.62rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px; }
+    .fix-sev-badge.critical { background:var(--risk-dim); color:var(--risk); border:1px solid rgba(184,95,95,0.28); }
+    .fix-sev-badge.warning  { background:var(--warn-dim); color:var(--warn); border:1px solid rgba(201,164,107,0.28); }
+    .fix-sev-badge.info     { background:var(--terra-dim); color:var(--terra); border:1px solid rgba(201,153,107,0.28); }
+    .fix-metric-name { font-size:0.81rem; font-weight:600; color:var(--cream); }
+    .fix-metric-val  { font-size:0.73rem; color:var(--muted); margin-left:auto; }
+    .fix-problem { font-size:0.77rem; color:var(--muted); margin-bottom:9px; line-height:1.55; }
+    .fix-steps-title { font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:5px; }
+    .fix-steps { font-size:0.77rem; color:var(--cream); line-height:1.65; opacity:0.85; }
+    .fix-example { margin-top:10px; background:var(--surface); border:1px solid var(--border); border-radius:7px; padding:11px 13px; font-family:'Consolas','Courier New',monospace; font-size:0.7rem; color:var(--terra); white-space:pre; overflow-x:auto; line-height:1.6; }
+
+    .toast { position:fixed; bottom:24px; right:24px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px 18px; font-size:0.83rem; color:var(--cream); max-width:300px; transform:translateY(100px); opacity:0; transition:transform .4s ease,opacity .4s ease; z-index:999; }
     .toast.show { transform:translateY(0); opacity:1; }
-    .toast strong { color:#7f7; }
+    .toast strong { color:var(--sage); }
 
-    /* Responsive — stack model cards on small screens */
-    @media (max-width: 600px) {
-      .models-grid { grid-template-columns:repeat(3,1fr); }
+    @media (max-width:700px) {
+      .models-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
       .summary { grid-template-columns:repeat(2,1fr); }
+      .file-right { flex-wrap:wrap; justify-content:flex-end; }
+      .metric-row { grid-template-columns:1fr; }
     }
+    @media (max-width:440px) { .models-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
   </style>
 </head>
 <body>
 <div class="container">
 
   <header>
+    <div class="eyebrow">AI-Powered Static Analysis</div>
     <h1>Code <span>Decay</span> Detector</h1>
-    <p>Upload any project as a ZIP — works with Python, JavaScript, Java, C++, and 19 more languages</p>
+    <p>Upload any project ZIP — Python, JavaScript, Java, C++, and 19 more languages</p>
+    <div class="divider"></div>
   </header>
 
-  <!-- Live community counter -->
   <div class="counter-banner">
     <div class="counter-dot"></div>
-    <p class="counter-text">
-      Community dataset: <strong id="rowCount">{{ dataset_rows | default(0) }}</strong> files analyzed and counting
-    </p>
+    <p class="counter-text">Community dataset: <strong id="rowCount">{{ dataset_rows | default(0) }}</strong> files analyzed and growing</p>
   </div>
 
   <div class="card">
-    <h2>Upload your project</h2>
+    <div class="card-label">Upload project</div>
     <div class="upload-zone" id="dropZone"
          onclick="document.getElementById('zipInput').click()"
          ondragover="event.preventDefault();this.classList.add('drag')"
          ondragleave="this.classList.remove('drag')"
          ondrop="handleDrop(event)">
       <input type="file" id="zipInput" accept=".zip" onchange="handleFile(this.files[0])">
-      <div class="icon">📦</div>
-      <div>Drag & drop your project ZIP here, or click to browse</div>
-      <div class="hint">Max 50MB · ZIP file only · All source files inside will be scanned</div>
-      <div class="chosen" id="chosenFile"></div>
+      <span class="upload-icon">📦</span>
+      <div class="upload-main">Drag & drop your project ZIP, or click to browse</div>
+      <div class="upload-hint">Max 50 MB · .zip only · All source files inside will be scanned</div>
+      <div class="upload-chosen" id="chosenFile"></div>
     </div>
-
-    <!-- Privacy note -->
     <div class="privacy-note">
-      <span class="shield">🔒</span>
-      <p>
-        <strong>Your code is never stored.</strong>
-        Only anonymised metrics (numbers like complexity scores) are collected
-        to improve future model accuracy. Your actual source files are deleted
-        immediately after analysis.
-      </p>
+      <span style="font-size:1rem;flex-shrink:0;margin-top:1px">🔒</span>
+      <p><strong>Your code is never stored.</strong> Only anonymised metrics are saved to improve model accuracy. Source files are deleted immediately after analysis.</p>
     </div>
-
-    <div style="margin-top:16px">
-      <div style="color:#888;font-size:0.78rem;margin-bottom:8px">Supported languages:</div>
-      <div class="lang-pills">
-        {% for lang in supported_languages %}
-        <span class="pill">{{ lang }}</span>
-        {% endfor %}
-      </div>
+    <div class="lang-section-label">Supported languages</div>
+    <div class="lang-pills">
+      {% for lang in supported_languages %}<span class="pill">{{ lang }}</span>{% endfor %}
     </div>
-
-    <button class="btn" id="analyzeBtn" onclick="analyzeProject()" disabled>
-      Analyze Project
-    </button>
+    <button class="btn" id="analyzeBtn" onclick="analyzeProject()" disabled>Analyze Project</button>
   </div>
 
+  <!-- Metrics Guide -->
+  <div class="guide-card">
+    <button class="guide-toggle" onclick="toggleGuide()">
+      <div class="guide-toggle-left"><span>📖</span><span>How We Measure Code Decay — Metrics Reference</span></div>
+      <span class="guide-toggle-chevron" id="guideChev">▼</span>
+    </button>
+    <div class="guide-body" id="guideBody">
+      <p class="guide-intro">Our system extracts <strong>26 features</strong> from every source file and runs them through 5 ML models trained on <strong>77,377 real-world software modules</strong> from NASA's MDP/PROMISE datasets and Kaggle — the same metrics NASA used to predict defects in actual satellite and aerospace software.</p>
+
+      <div class="formula-box">
+        <div class="formula-title">Risk Score Formula — weighted model ensemble</div>
+        <div class="formula-row">
+          <div class="formula-chip"><span class="model-w">×0.35</span><span class="model-n">Gradient Boosting</span></div>
+          <span class="formula-plus">+</span>
+          <div class="formula-chip"><span class="model-w">×0.25</span><span class="model-n">XGBoost</span></div>
+          <span class="formula-plus">+</span>
+          <div class="formula-chip"><span class="model-w">×0.15</span><span class="model-n">Random Forest</span></div>
+          <span class="formula-plus">+</span>
+          <div class="formula-chip"><span class="model-w">×0.15</span><span class="model-n">SVM</span></div>
+          <span class="formula-plus">+</span>
+          <div class="formula-chip"><span class="model-w">×0.10</span><span class="model-n">AdaBoost</span></div>
+        </div>
+        <div class="verdict-rule">Each model contributes its confidence the file is defective (or 100 − confidence if it voted clean). Weights reflect model accuracy. <br><br><strong>Final verdict = majority vote:</strong> 3 or more of 5 models saying defective → "At Risk". A file can score 45% risk but still be flagged if 3 models agreed.</div>
+      </div>
+
+      <div class="guide-section-title">Risk score colour scale</div>
+      <div class="scale-legend">
+        <div class="scale-chip"><div class="scale-dot" style="background:var(--sage)"></div><div><strong style="color:var(--sage)">0–40%</strong>&nbsp; Low — likely healthy</div></div>
+        <div class="scale-chip"><div class="scale-dot" style="background:var(--warn)"></div><div><strong style="color:var(--warn)">40–70%</strong>&nbsp; Moderate — review recommended</div></div>
+        <div class="scale-chip"><div class="scale-dot" style="background:var(--risk)"></div><div><strong style="color:var(--risk)">70–100%</strong>&nbsp; High — defect likely</div></div>
+      </div>
+
+      <div class="guide-section-title">Top features driving the prediction</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:6px">
+        <div class="formula-chip" style="justify-content:space-between;padding:9px 13px"><span class="model-n">Past defects</span><span class="model-w">42.91%</span></div>
+        <div class="formula-chip" style="justify-content:space-between;padding:9px 13px"><span class="model-n">Static warnings</span><span class="model-w">23.93%</span></div>
+        <div class="formula-chip" style="justify-content:space-between;padding:9px 13px"><span class="model-n">Cyclomatic complexity</span><span class="model-w">16.43%</span></div>
+        <div class="formula-chip" style="justify-content:space-between;padding:9px 13px"><span class="model-n">Test coverage est.</span><span class="model-w">10.60%</span></div>
+      </div>
+      <div style="font-size:0.73rem;color:var(--muted);margin-bottom:16px;line-height:1.6">All other features &lt; 1.3% each. Git-based metrics default to 0 for ZIP uploads — git history is unavailable.</div>
+
+      <div class="guide-section-title">Individual metric baselines</div>
+      <div class="metric-rows">
+        <div class="metric-row">
+          <div class="metric-row-name">Lines of Code <span class="tag tag-info">size</span></div>
+          <div class="metric-row-body">Non-blank, non-comment executable lines. More lines = larger surface area for bugs, but size alone is not a defect signal.<div class="baseline"><span class="bl-chip bl-green">≤ 200 · Small</span><span class="bl-chip bl-orange">200–500 · Medium</span><span class="bl-chip bl-red">&gt; 500 · Large, consider splitting</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Cyclomatic Complexity <span class="tag tag-warn">key signal</span></div>
+          <div class="metric-row-body">Counts decision points: <code>if</code>, <code>for</code>, <code>while</code>, <code>catch</code>, <code>and</code>, <code>or</code>. How many paths can execution take? High = harder to test, more hidden bugs. <strong style="color:var(--cream)">3rd most important (16.43%).</strong><div class="baseline"><span class="bl-chip bl-green">1–10 · Simple</span><span class="bl-chip bl-orange">10–20 · Moderate, add tests</span><span class="bl-chip bl-red">&gt; 20 · Complex, refactor</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Functions <span class="tag tag-info">structure</span></div>
+          <div class="metric-row-body">Total function/method definitions. Not bad alone, but combines with avg length and coupling to signal design problems.<div class="baseline"><span class="bl-chip bl-green">1–15 · Normal</span><span class="bl-chip bl-orange">15–40 · Large file</span><span class="bl-chip bl-red">&gt; 40 · God file, split it</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Classes <span class="tag tag-info">structure</span></div>
+          <div class="metric-row-body">Class definitions <em>in this file</em> — not imported ones. Zero is normal for utility modules. Java/C# also count interfaces, enums, structs. Go counts structs. Rust counts traits.<div class="baseline"><span class="bl-chip bl-green">0–5 · Normal</span><span class="bl-chip bl-orange">5–15 · Large</span><span class="bl-chip bl-red">&gt; 15 · Consider splitting</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Comment Density <span class="tag tag-info">readability</span></div>
+          <div class="metric-row-body"><code>comment_lines ÷ total_lines</code>. Too low = undocumented; too high = auto-generated or over-commented.<div class="baseline"><span class="bl-chip bl-green">0.10–0.30 · Well documented</span><span class="bl-chip bl-orange">0.03–0.10 · Sparse</span><span class="bl-chip bl-red">&lt; 0.03 · Undocumented</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Static Warnings <span class="tag tag-warn">key signal</span></div>
+          <div class="metric-row-body">Risky patterns: <code>eval(</code>, <code>exec(</code>, <code>TODO</code>, <code>FIXME</code>, <code>HACK</code>, <code>os.system</code>, <code>catch(Exception)</code>, bare <code>pass</code>, etc. <strong style="color:var(--cream)">2nd most important (23.93%).</strong> Even one FIXME increments this.<div class="baseline"><span class="bl-chip bl-green">0 · Clean</span><span class="bl-chip bl-orange">1–3 · Minor concerns</span><span class="bl-chip bl-red">&gt; 3 · Needs review</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Security Issues <span class="tag tag-bad">critical</span></div>
+          <div class="metric-row-body">Known dangerous patterns: <code>eval(</code>, <code>pickle.loads(</code>, <code>yaml.load(</code>, <code>shell=True</code>, <code>verify=False</code>, <code>hashlib.md5(</code>, <code>innerHTML</code>, <code>dangerouslySetInnerHTML</code>, and more. Even 1 warrants inspection.<div class="baseline"><span class="bl-chip bl-green">0 · No known patterns</span><span class="bl-chip bl-orange">1–2 · Review usage</span><span class="bl-chip bl-red">&gt; 2 · Audit required</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Duplication % <span class="tag tag-warn">maintainability</span></div>
+          <div class="metric-row-body"><code>1 − (unique lines ÷ total lines)</code>. 0.30 = 30% of lines are duplicates of another line in this file. Bug fixes in one copy may miss others.<div class="baseline"><span class="bl-chip bl-green">&lt; 0.10 · Low</span><span class="bl-chip bl-orange">0.10–0.30 · Moderate</span><span class="bl-chip bl-red">&gt; 0.30 · Refactor into functions</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Test Coverage Est. <span class="tag tag-warn">key signal</span></div>
+          <div class="metric-row-body">Language-specific patterns: Python finds <code>def test_</code>, <code>class Test</code>, <code>assert</code>, <code>@pytest</code>; Java finds <code>@Test</code>, <code>assertEquals</code>; JS finds <code>describe(</code>, <code>it(</code>, <code>expect(</code>. <strong style="color:var(--cream)">4th most important (10.60%).</strong> Zero = no test keywords in this file — include your tests/ folder in the ZIP.<div class="baseline"><span class="bl-chip bl-green">≥ 0.50 · Good test presence</span><span class="bl-chip bl-orange">0.10–0.50 · Some tests</span><span class="bl-chip bl-red">&lt; 0.10 · Likely untested</span></div></div>
+        </div>
+        <div class="metric-row">
+          <div class="metric-row-name">Coupling <span class="tag tag-warn">maintainability</span></div>
+          <div class="metric-row-body">Counts <code>import</code>, <code>from</code>, <code>require</code>, <code>include</code>, <code>using</code> statements. High coupling = tightly tied to many external dependencies, harder to test in isolation.<div class="baseline"><span class="bl-chip bl-green">0–5 · Low</span><span class="bl-chip bl-orange">5–15 · Moderate</span><span class="bl-chip bl-red">&gt; 15 · Highly coupled</span></div></div>
+        </div>
+      </div>
+
+      <div class="dataset-note">
+        <span class="dn-icon">ℹ️</span>
+        <div><strong>Git-based metrics</strong> (code churn, commit frequency, bug fix commits, developer experience, past defects, build failures) all default to <strong>0</strong> for ZIP uploads — git history is not included. In the NASA training data, <strong>past_defects alone is 42.91%</strong> of feature importance, so the model relies more on static metrics for ZIP analysis.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Real-time loader -->
   <div id="loader">
-    <div>Scanning files and predicting decay...</div>
-    <div class="progress"><div class="progress-bar"></div></div>
+    <div class="spinner-wrap"><div class="spinner"></div></div>
+    <div class="loader-title">Analyzing your project…</div>
+    <div class="loader-timer">Elapsed: <span id="timerDisplay">0.0s</span></div>
+    <div class="loader-steps">
+      <div class="lstep" id="step0"><span class="lstep-icon">📤</span><span class="lstep-label">Uploading ZIP file</span></div>
+      <div class="lstep" id="step1"><span class="lstep-icon">📂</span><span class="lstep-label">Extracting and scanning source files</span></div>
+      <div class="lstep" id="step2"><span class="lstep-icon">🔬</span><span class="lstep-label">Computing AST + code metrics</span></div>
+      <div class="lstep" id="step3"><span class="lstep-icon">🤖</span><span class="lstep-label">Running 5 ML models</span></div>
+      <div class="lstep" id="step4"><span class="lstep-icon">📊</span><span class="lstep-label">Computing risk scores and verdicts</span></div>
+    </div>
   </div>
 
   <div id="results">
@@ -170,12 +393,72 @@
   </div>
 
 </div>
-
-<!-- Contribution toast notification -->
 <div class="toast" id="toast"></div>
 
 <script>
-let selectedFile = null;
+let selectedFile  = null;
+let timerInterval = null;
+let stepTimeouts  = [];   // stores all pending step setTimeout IDs so we can cancel them
+
+// How long (ms) to stay on each step before moving to the next.
+// Steps 0-3 advance automatically during the wait.
+// Step 4 (final) is NEVER advanced by a timer — only stopLoader() completes it.
+const STEP_DURATIONS = [900, 1800, 2200, 2800];
+
+function startLoader() {
+  document.getElementById('loader').style.display = 'block';
+  for (let i = 0; i < 5; i++) {
+    const s = document.getElementById('step' + i);
+    s.classList.remove('active','done');
+  }
+  document.getElementById('step0').classList.add('active');
+
+  const start = Date.now();
+  document.getElementById('timerDisplay').textContent = '0.0s';
+  timerInterval = setInterval(() => {
+    document.getElementById('timerDisplay').textContent =
+      ((Date.now() - start) / 1000).toFixed(1) + 's';
+  }, 100);
+
+  // Advance steps 0 → 3 on a timer so the UI shows activity while waiting.
+  // Step 4 (Computing risk scores) is intentionally NEVER triggered here.
+  // It only completes when stopLoader() is called — i.e. when the real server
+  // response actually arrives.
+  let cumulative = 0;
+  stepTimeouts = [];
+  STEP_DURATIONS.forEach((dur, idx) => {
+    cumulative += dur;
+    const id = setTimeout(() => {
+      // Mark current step done, activate next — but never past step 3
+      document.getElementById('step' + idx).classList.remove('active');
+      document.getElementById('step' + idx).classList.add('done');
+      document.getElementById('step' + (idx + 1)).classList.add('active');
+    }, cumulative);
+    stepTimeouts.push(id);
+  });
+}
+
+function stopLoader() {
+  // Cancel any step transitions that haven't fired yet
+  stepTimeouts.forEach(id => clearTimeout(id));
+  stepTimeouts = [];
+  clearInterval(timerInterval);
+
+  // Snap whatever state we're in: all steps → done
+  for (let i = 0; i < 5; i++) {
+    const s = document.getElementById('step' + i);
+    s.classList.remove('active');
+    s.classList.add('done');
+  }
+
+  // Brief pause so the user sees "all done" before the panel hides
+  setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 520);
+}
+
+function toggleGuide() {
+  document.getElementById('guideBody').classList.toggle('open');
+  document.getElementById('guideChev').classList.toggle('open');
+}
 
 function handleFile(file) {
   if (!file) return;
@@ -193,19 +476,22 @@ function handleDrop(e) {
 
 async function analyzeProject() {
   if (!selectedFile) return;
-
-  document.getElementById('loader').style.display = 'block';
-  document.getElementById('results').style.display = 'none';
+  const results = document.getElementById('results');
+  results.classList.remove('visible');
+  results.style.display = 'none';
   document.getElementById('analyzeBtn').disabled = true;
+
+  startLoader();
 
   const formData = new FormData();
   formData.append('project_zip', selectedFile);
 
   try {
+    // The spinner keeps running until this await resolves — no fake progress
     const res  = await fetch('/analyze', { method:'POST', body:formData });
     const data = await res.json();
 
-    document.getElementById('loader').style.display = 'none';
+    stopLoader();
     document.getElementById('analyzeBtn').disabled = false;
 
     if (data.error) { alert('Error: ' + data.error); return; }
@@ -213,95 +499,276 @@ async function analyzeProject() {
     renderSummary(data.summary);
     renderLangBar(data.summary.lang_counts);
     renderFiles(data.results);
-    document.getElementById('results').style.display = 'block';
+
+    // Delay slightly so "all steps done" state is visible before results appear
+    setTimeout(() => {
+      results.style.display = 'block';
+      results.offsetHeight; // force reflow
+      results.classList.add('visible');
+    }, 560);
 
     showToast(data.summary.total_files);
-    setTimeout(refreshCounter, 2000);
+    setTimeout(refreshCounter, 2500);
 
-  } catch(e) {
-    document.getElementById('loader').style.display = 'none';
+  } catch (e) {
+    stopLoader();
     document.getElementById('analyzeBtn').disabled = false;
     alert('Something went wrong: ' + e.message);
   }
 }
 
-function showToast(fileCount) {
-  const toast = document.getElementById('toast');
-  toast.innerHTML = `<strong>✓ Thank you!</strong> ${fileCount} file metric${fileCount > 1 ? 's' : ''} anonymously contributed to our community dataset.`;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 4000);
+function showToast(n) {
+  const t = document.getElementById('toast');
+  t.innerHTML = `<strong>✓ Done!</strong> ${n} file metric${n>1?'s':''} anonymously added to the community dataset.`;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 4500);
 }
 
 function refreshCounter() {
-  fetch('/dataset-stats')
-    .then(r => r.json())
-    .then(d => {
-      document.getElementById('rowCount').textContent = d.rows.toLocaleString();
-    })
-    .catch(() => {});
+  fetch('/dataset-stats').then(r=>r.json())
+    .then(d => { document.getElementById('rowCount').textContent = d.rows.toLocaleString(); })
+    .catch(()=>{});
 }
 
 function renderSummary(s) {
   document.getElementById('summary').innerHTML = `
-    <div class="stat"><div class="num" style="color:#4f8ef7">${s.total_files}</div><div class="lbl">Files scanned</div></div>
-    <div class="stat"><div class="num" style="color:#f77">${s.defective}</div><div class="lbl">At risk</div></div>
-    <div class="stat"><div class="num" style="color:#7f7">${s.clean}</div><div class="lbl">Healthy</div></div>
-    <div class="stat"><div class="num" style="color:#fa7">${s.avg_risk}%</div><div class="lbl">Avg risk score</div></div>`;
+    <div class="stat"><div class="num" style="color:var(--terra)">${s.total_files}</div><div class="lbl">Files scanned</div></div>
+    <div class="stat"><div class="num" style="color:var(--risk)">${s.defective}</div><div class="lbl">At risk</div></div>
+    <div class="stat"><div class="num" style="color:var(--sage)">${s.clean}</div><div class="lbl">Healthy</div></div>
+    <div class="stat"><div class="num" style="color:var(--warn)">${s.avg_risk}%</div><div class="lbl">Avg risk score</div></div>`;
 }
 
 function renderLangBar(counts) {
-  const bar = document.getElementById('langBar');
-  bar.innerHTML = '<span style="color:#888;font-size:0.78rem;align-self:center">Languages found:</span>' +
-    Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([lang, count]) =>
-      `<div class="lang-tag">${lang}<span>${count} file${count>1?'s':''}</span></div>`
-    ).join('');
+  document.getElementById('langBar').innerHTML =
+    '<span class="lang-bar-label">Languages detected:</span>' +
+    Object.entries(counts).sort((a,b)=>b[1]-a[1])
+      .map(([l,c])=>`<div class="lang-tag">${l}<span>${c}</span></div>`).join('');
 }
+
+const MODEL_ORDER = ['Gradient Boosting','XGBoost','Random Forest','SVM','AdaBoost'];
+
+const METRIC_INFO = {
+  'Lines of code':{ desc:'Non-blank, non-comment lines. More = more surface area for bugs.', scale:[{color:'var(--sage)',label:'≤ 200 — Small'},{color:'var(--warn)',label:'200–500 — Medium'},{color:'var(--risk)',label:'> 500 — Large, split it'}] },
+  'Cyclomatic complexity':{ desc:'Decision point count (if/for/while/catch/and/or). 3rd most important feature (16.43%).', scale:[{color:'var(--sage)',label:'1–10 — Simple'},{color:'var(--warn)',label:'10–20 — Moderate'},{color:'var(--risk)',label:'> 20 — Complex, refactor'}] },
+  'Functions':{ desc:'Function/method definitions. High count + high avg length = God file.', scale:[{color:'var(--sage)',label:'1–15 — Normal'},{color:'var(--warn)',label:'15–40 — Large'},{color:'var(--risk)',label:'> 40 — Split this file'}] },
+  'Classes':{ desc:'Class definitions in this file only. Zero is normal for utility/script files.', scale:[{color:'var(--sage)',label:'0–5 — Normal'},{color:'var(--warn)',label:'5–15 — Large'},{color:'var(--risk)',label:'> 15 — Split it'}] },
+  'Comment density':{ desc:'comment_lines ÷ total_lines. Low = undocumented; very high = auto-generated.', scale:[{color:'var(--sage)',label:'0.10–0.30 — Well documented'},{color:'var(--warn)',label:'0.03–0.10 — Sparse'},{color:'var(--risk)',label:'< 0.03 — Undocumented'}] },
+  'Static warnings':{ desc:'Risky patterns: eval(), exec(), TODO, FIXME, HACK, os.system, catch(Exception)… 2nd most important (23.93%).', scale:[{color:'var(--sage)',label:'0 — Clean'},{color:'var(--warn)',label:'1–3 — Minor'},{color:'var(--risk)',label:'> 3 — Needs review'}] },
+  'Security issues':{ desc:'Dangerous: eval(), pickle.loads(), shell=True, verify=False, hashlib.md5(), innerHTML, etc.', scale:[{color:'var(--sage)',label:'0 — No known patterns'},{color:'var(--warn)',label:'1–2 — Review usage'},{color:'var(--risk)',label:'> 2 — Audit required'}] },
+  'Duplication %':{ desc:'1 − (unique lines ÷ total lines). Bug fixes in one copy may miss duplicates.', scale:[{color:'var(--sage)',label:'< 0.10 — Low'},{color:'var(--warn)',label:'0.10–0.30 — Moderate'},{color:'var(--risk)',label:'> 0.30 — Refactor'}] },
+  'Test coverage est.':{ desc:'Language-specific test patterns (def test_, @Test, describe(), assert…). 4th most important (10.60%). Include tests/ in ZIP.', scale:[{color:'var(--sage)',label:'≥ 0.50 — Good'},{color:'var(--warn)',label:'0.10–0.50 — Some tests'},{color:'var(--risk)',label:'< 0.10 — Likely untested'}] },
+  'Coupling':{ desc:'import/require/include count. High coupling = tightly tied to external dependencies.', scale:[{color:'var(--sage)',label:'0–5 — Low'},{color:'var(--warn)',label:'5–15 — Moderate'},{color:'var(--risk)',label:'> 15 — Highly coupled'}] },
+};
+
+function metricValueClass(k, v) {
+  if (k==='Comment density') { if (v>=0.10&&v<=0.30) return 'val-good'; if (v>=0.03) return 'val-warn'; return 'val-bad'; }
+  if (k==='Test coverage est.') { if (v>=0.50) return 'val-good'; if (v>=0.10) return 'val-warn'; return 'val-bad'; }
+  const t={'Lines of code':[200,500],'Cyclomatic complexity':[10,20],'Functions':[15,40],'Classes':[5,15],'Static warnings':[1,4],'Security issues':[1,3],'Duplication %':[0.10,0.30],'Coupling':[5,15]}[k];
+  if (!t) return '';
+  return v<=t[0]?'val-good':v<=t[1]?'val-warn':'val-bad';
+}
+
+// ── generateFixes ─────────────────────────────────────────────────────────
+// Generates actionable fix suggestions entirely from the metrics object
+// that app.py already sends. The backend never sends a "fixes" field, so
+// we build this client-side. renderFixes() calls this and renders the panel.
+function generateFixes(metrics, language) {
+  const fixes = [];
+  const lang = language || 'Python';
+
+  const cc   = metrics['Cyclomatic complexity'] || 0;
+  const loc  = metrics['Lines of code'] || 0;
+  const sw   = metrics['Static warnings'] || 0;
+  const sec  = metrics['Security issues'] || 0;
+  const dup  = metrics['Duplication %'] || 0;
+  const tc   = metrics['Test coverage est.'] || 0;
+  const coup = metrics['Coupling'] || 0;
+  const cd   = metrics['Comment density'] || 0;
+  const fn   = metrics['Functions'] || 0;
+
+  // ── Security issues ──────────────────────────────────────────────────────
+  if (sec >= 1) {
+    const isPy = lang === 'Python';
+    fixes.push({
+      severity: 'critical',
+      metric: 'Security Issues',
+      value: sec,
+      problem: `${sec} known dangerous pattern${sec>1?'s':''} found (e.g. eval(), pickle.loads(), shell=True, verify=False, hashlib.md5, innerHTML).`,
+      fix: isPy
+        ? '1. Replace eval()/exec() with ast.literal_eval() or a dedicated parser.\n2. Replace pickle.loads() with json.loads() or a safe serialiser.\n3. Change yaml.load(f) → yaml.safe_load(f).\n4. Remove shell=True from subprocess — pass a list instead: subprocess.run(["cmd", "arg"]).\n5. Replace verify=False with a proper CA bundle or certifi.\n6. Replace hashlib.md5/sha1 with hashlib.sha256 or better.'
+        : '1. Never pass user input to eval() or innerHTML.\n2. Validate and sanitise all external data before use.\n3. Replace dangerous API calls with safe equivalents documented in your language\'s security guide.',
+      example: isPy
+        ? '# BEFORE (dangerous)\nresult = eval(user_input)\ndata   = pickle.loads(raw_bytes)\nresp   = requests.get(url, verify=False)\n\n# AFTER (safe)\nimport ast, json, hashlib\nresult = ast.literal_eval(user_input)   # only literals, no code\ndata   = json.loads(raw_bytes)          # no arbitrary objects\nresp   = requests.get(url, verify=True) # or verify=certifi.where()'
+        : null
+    });
+  }
+
+  // ── Static warnings ──────────────────────────────────────────────────────
+  if (sw >= 4) {
+    fixes.push({
+      severity: 'critical',
+      metric: 'Static Warnings',
+      value: sw,
+      problem: `${sw} risky code patterns found (TODO/FIXME/HACK comments, bare except/pass, os.system, eval, etc.). This is the 2nd most important defect predictor.`,
+      fix: '1. Resolve every TODO/FIXME — open a real issue ticket instead of an inline comment.\n2. Replace bare except:/catch(Exception) with specific exception types.\n3. Remove bare pass in except blocks — at minimum log the error.\n4. Replace os.system() and subprocess.call(shell=True) with subprocess.run(list).\n5. Run a linter (flake8, pylint, ESLint) to surface all remaining warnings.',
+      example: '# BEFORE (triggers warnings)\ntry:\n    risky_operation()\nexcept:    # catches EVERYTHING including KeyboardInterrupt\n    pass   # silently swallows the error\n\n# AFTER (specific and logged)\nimport logging\ntry:\n    risky_operation()\nexcept ValueError as e:\n    logging.warning("risky_operation failed: %s", e)\n    raise'
+    });
+  } else if (sw >= 1) {
+    fixes.push({
+      severity: 'warning',
+      metric: 'Static Warnings',
+      value: sw,
+      problem: `${sw} minor risky pattern${sw>1?'s':''} (e.g. TODO comments, loose exception handling).`,
+      fix: '1. Convert TODO/FIXME comments into tracked issues.\n2. Narrow exception handlers to specific types.\n3. Run flake8 or your language\'s linter for a full list.',
+      example: null
+    });
+  }
+
+  // ── Cyclomatic complexity ────────────────────────────────────────────────
+  if (cc > 20) {
+    fixes.push({
+      severity: 'critical',
+      metric: 'Cyclomatic Complexity',
+      value: cc,
+      problem: `Complexity of ${cc} is very high (threshold: 20). Every branch is a potential untested path and a likely bug location.`,
+      fix: '1. Extract deeply nested blocks into named helper functions.\n2. Replace long if/elif chains with a dictionary dispatch or strategy pattern.\n3. Split the file — each function should do one thing.\n4. Aim for complexity ≤ 10 per function; tools like radon (Python) or jscpd can measure this.',
+      example: '# BEFORE — one huge function with 8 branches\ndef process(x):\n    if x == "a":\n        ...\n    elif x == "b":\n        ...\n    # ... 6 more elif branches\n\n# AFTER — dictionary dispatch (O(1), zero branching)\nHANDLERS = {\n    "a": handle_a,\n    "b": handle_b,\n    ...\n}\ndef process(x):\n    handler = HANDLERS.get(x, handle_default)\n    return handler()'
+    });
+  } else if (cc > 10) {
+    fixes.push({
+      severity: 'warning',
+      metric: 'Cyclomatic Complexity',
+      value: cc,
+      problem: `Complexity of ${cc} is moderate (threshold: 10). Consider adding tests for each branch.`,
+      fix: '1. Write a test case for every branch (if/else/except path).\n2. Extract the most complex functions first.\n3. Use radon cc (Python) to find the specific functions with highest complexity.',
+      example: null
+    });
+  }
+
+  // ── Test coverage ────────────────────────────────────────────────────────
+  if (tc < 0.10) {
+    fixes.push({
+      severity: 'warning',
+      metric: 'Test Coverage Est.',
+      value: tc.toFixed(3),
+      problem: 'No test patterns detected in this file. Low test coverage is the 4th most important defect predictor. Note: if your tests are in a separate tests/ folder, include it in the ZIP.',
+      fix: lang === 'Python'
+        ? '1. Create tests/test_<filename>.py.\n2. Write at least one test per public function using pytest.\n3. Run: pytest --cov=. --cov-report=term-missing\n4. Aim for ≥ 80% line coverage on critical logic.'
+        : lang === 'JavaScript' || lang === 'TypeScript'
+        ? '1. Add a test file: <filename>.test.js\n2. Use Jest or Vitest: describe() / it() / expect()\n3. Run: npx jest --coverage'
+        : '1. Add a test file for this module.\n2. Cover all public methods with at least one happy-path and one error-path test.',
+      example: lang === 'Python'
+        ? '# tests/test_analyzer.py\nimport pytest\nfrom coderot.analyzer import analyze_file\n\ndef test_analyze_returns_none_for_unknown_extension(tmp_path):\n    f = tmp_path / "file.xyz"\n    f.write_text("hello")\n    assert analyze_file(str(f)) is None\n\ndef test_analyze_counts_lines_of_code(tmp_path):\n    f = tmp_path / "sample.py"\n    f.write_text("x = 1\\ny = 2\\n# comment\\n")\n    result = analyze_file(str(f))\n    assert result["lines_of_code"] == 2'
+        : null
+    });
+  }
+
+  // ── Duplication ──────────────────────────────────────────────────────────
+  if (dup > 0.30) {
+    fixes.push({
+      severity: 'warning',
+      metric: 'Duplication %',
+      value: (dup * 100).toFixed(1) + '%',
+      problem: `${(dup*100).toFixed(0)}% of lines are duplicates within this file. A bug fixed in one copy is likely missed in others.`,
+      fix: '1. Identify the repeated blocks using a diff viewer or jscpd.\n2. Extract repeated logic into a shared helper function.\n3. Use constants for repeated string/number literals.\n4. Apply the DRY principle: every piece of knowledge should have a single representation.',
+      example: '# BEFORE — same validation in 3 places\ndef create_user(email):\n    if not email or "@" not in email:\n        raise ValueError("bad email")\n    ...\ndef update_user(email):\n    if not email or "@" not in email:  # duplicate!\n        raise ValueError("bad email")\n    ...\n\n# AFTER — one function, called everywhere\ndef _validate_email(email):\n    if not email or "@" not in email:\n        raise ValueError(f"Invalid email: {email!r}")\n\ndef create_user(email):\n    _validate_email(email)\n    ...'
+    });
+  }
+
+  // ── Comment density ──────────────────────────────────────────────────────
+  if (cd < 0.03 && loc > 50) {
+    fixes.push({
+      severity: 'info',
+      metric: 'Comment Density',
+      value: cd.toFixed(3),
+      problem: 'Almost no comments found. Undocumented code is harder to review, maintain, and onboard new developers onto.',
+      fix: '1. Add a module-level docstring explaining what this file does.\n2. Add docstrings to every public function: what it does, parameters, return value, exceptions.\n3. Add inline comments for any non-obvious logic (why, not what).\n4. Target 10–30% comment density.',
+      example: lang === 'Python'
+        ? '# BEFORE\ndef calc(x, t):\n    return x * (1 + t) ** 12\n\n# AFTER\ndef compound_annual_growth(principal: float, monthly_rate: float) -> float:\n    """Return the value after 12 months of compound growth.\n\n    Args:\n        principal: Starting amount (e.g. 1000.0)\n        monthly_rate: Monthly interest rate as a decimal (e.g. 0.005 for 0.5%)\n    Returns:\n        Final value after 12 compounding periods\n    """\n    return principal * (1 + monthly_rate) ** 12'
+        : null
+    });
+  }
+
+  // ── Coupling ────────────────────────────────────────────────────────────
+  if (coup > 15) {
+    fixes.push({
+      severity: 'info',
+      metric: 'Coupling',
+      value: coup,
+      problem: `${coup} import statements — this file depends on many external modules, making it harder to test in isolation and fragile when dependencies change.`,
+      fix: '1. Check if some imports are only used in one function — move them inside that function or split the file.\n2. Group related functionality into a dedicated module to reduce what each file needs to import.\n3. Use dependency injection: pass dependencies as arguments instead of importing them at module level.\n4. Consider a facade pattern to hide multiple low-level imports behind a single interface.',
+      example: null
+    });
+  }
+
+  return fixes;
+}
+
+function renderFixes(metrics, language) {
+  const fixes = generateFixes(metrics, language);
+  if (!fixes.length) return '';
+  const ICON = { critical:'🔴', warning:'🟡', info:'🔵' };
+  return '<div class="fixes-panel"><div class="section-label">Suggested fixes</div>' +
+    fixes.map(f => `
+      <div class="fix-item ${f.severity}">
+        <div class="fix-header">
+          <span class="fix-sev-badge ${f.severity}">${ICON[f.severity]} ${f.severity}</span>
+          <span class="fix-metric-name">${f.metric}</span>
+          <span class="fix-metric-val">measured: ${f.value}</span>
+        </div>
+        <div class="fix-problem">⚠ ${f.problem}</div>
+        <div class="fix-steps-title">How to fix</div>
+        <div class="fix-steps">${f.fix}</div>
+        ${f.example ? `<div class="fix-example">${esc(f.example)}</div>` : ''}
+      </div>`).join('') + '</div>';
+}
+
+function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderFiles(results) {
   const list = document.getElementById('fileList');
   list.innerHTML = '';
+  results.forEach((r,i) => {
+    const isDef = r.is_defective;
+    const rc = r.risk_score>70?'var(--risk)':r.risk_score>40?'var(--warn)':'var(--sage)';
+    const agreeC = r.agree?(isDef?'agree-defect':'agree-clean'):'disagree';
+    const agreeT = r.agree?(isDef?'⚠ All 5 models agree — defect likely':'✓ All 5 models agree — looks healthy'):`${r.votes_defective}/5 models flagged as at risk — manual review recommended`;
 
-  results.forEach((r, i) => {
-    const isDef  = r.is_defective;
-    const color  = r.risk_score > 70 ? '#f77' : r.risk_score > 40 ? '#fa7' : '#7f7';
-
-    // Agreement banner
-    const agreeC = r.agree
-      ? (isDef ? 'agree-defect' : 'agree-clean')
-      : 'disagree';
-    const agreeT = r.agree
-      ? (isDef ? 'All 5 models agree — defect likely' : 'All 5 models agree — looks healthy')
-      : `${r.votes_defective}/5 models say at risk — manual review recommended`;
-
-    // All 5 model cards
-    const modelCards = Object.entries(r.models).map(([name, m]) => `
-      <div class="model-box">
+    const modelCards = MODEL_ORDER.map(name => {
+      const m = r.models[name]; if (!m) return '';
+      const c = m.pred===1?'var(--risk)':'var(--sage)';
+      return `<div class="model-box">
         <div class="model-name">${name}</div>
-        <div class="verdict" style="color:${m.pred===1?'#f77':'#7f7'}">
-          ${m.pred===1 ? '⚠ At risk' : '✓ Healthy'}
-        </div>
-        <div class="conf">${m.conf}%</div>
-      </div>`).join('');
+        <div class="model-verdict" style="color:${c}">${m.pred===1?'⚠ At risk':'✓ Healthy'}</div>
+        <div class="conf-bar-wrap"><div class="conf-bar" style="width:${m.conf}%;background:${c}"></div></div>
+        <div class="conf-pct">${m.conf}%</div>
+      </div>`;
+    }).join('');
 
-    // Metrics
-    const metrics = Object.entries(r.metrics).map(([k,v]) =>
-      `<div class="metric-item">
-        <div class="mk">${k}</div>
-        <div class="mv">${typeof v==='number'&&v%1!==0?v.toFixed(3):v}</div>
-      </div>`
-    ).join('');
+    const metricsHtml = Object.entries(r.metrics).map(([k,v]) => {
+      const info = METRIC_INFO[k];
+      const dv = typeof v==='number'&&v%1!==0?v.toFixed(3):v;
+      const cls = metricValueClass(k,v);
+      const tip = info?`<div class="metric-tooltip">
+        <div class="tooltip-name">${k}</div>
+        <div class="tooltip-desc">${info.desc}</div>
+        <div class="tooltip-scale">${info.scale.map(s=>`<div class="tooltip-scale-row"><div class="ts-dot" style="background:${s.color}"></div><span>${s.label}</span></div>`).join('')}</div>
+      </div>`:'';
+      return `<div class="metric-item">
+        <div class="metric-mk">${k}${info?'<span class="info-icon">i</span>':''}</div>
+        <div class="metric-mv ${cls}">${dv}</div>${tip}
+      </div>`;
+    }).join('');
 
     const card = document.createElement('div');
     card.className = 'file-card';
     card.innerHTML = `
       <div class="file-header" onclick="toggle(${i})">
         <div class="file-left">
-          <div class="name">${r.filename}</div>
-          <div class="path">${r.filepath}</div>
+          <div class="fname" title="${r.filename}">${r.filename}</div>
+          <div class="fpath" title="${r.filepath}">${r.filepath}</div>
           <span class="lang-badge">${r.language}</span>
-          <div class="risk-bar-wrap">
-            <div class="risk-bar" style="width:${r.risk_score}%;background:${color}"></div>
-          </div>
+          <div class="risk-bar-wrap"><div class="risk-bar" style="width:${r.risk_score}%;background:${rc}"></div></div>
         </div>
         <div class="file-right">
           <span class="risk-pct">Risk: ${r.risk_score}%</span>
@@ -312,10 +779,11 @@ function renderFiles(results) {
       </div>
       <div class="file-details" id="det${i}">
         <div class="agree-banner ${agreeC}">${agreeT}</div>
-        <div class="models-grid">
-          ${modelCards}
-        </div>
-        <div class="metrics-grid">${metrics}</div>
+        <div class="section-label">Model verdicts</div>
+        <div class="models-grid">${modelCards}</div>
+        <div class="section-label">Code metrics <span style="font-size:0.66rem;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400">— hover any card for baseline</span></div>
+        <div class="metrics-grid">${metricsHtml}</div>
+        ${renderFixes(r.metrics, r.language)}
       </div>`;
     list.appendChild(card);
   });
