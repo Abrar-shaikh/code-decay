@@ -11,3 +11,4 @@ radon
 werkzeug
 gspread
 google-auth
+xgboost
