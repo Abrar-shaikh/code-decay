@@ -61,7 +61,12 @@
     .upload-icon { font-size:2.4rem; margin-bottom:14px; display:block; }
     .upload-main { font-size:0.92rem; color:var(--cream); font-weight:500; }
     .upload-hint { color:var(--muted); font-size:0.79rem; margin-top:8px; }
-    .upload-chosen { color:var(--terra); font-weight:600; margin-top:10px; font-size:0.89rem; }
+
+    /* ── Cancel button + chosen file ── */
+    .upload-chosen { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:10px; min-height:1.4em; }
+    .upload-chosen-name { color:var(--terra); font-weight:600; font-size:0.89rem; }
+    .cancel-btn { display:none; align-items:center; gap:5px; background:none; border:1px solid var(--border); border-radius:6px; padding:3px 10px; font-size:0.75rem; color:var(--muted); cursor:pointer; transition:border-color .2s,color .2s,background .2s; flex-shrink:0; }
+    .cancel-btn:hover { border-color:var(--risk); color:var(--risk); background:var(--risk-dim); }
 
     .privacy-note { display:flex; align-items:flex-start; gap:10px; margin-top:14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:11px 14px; }
     .privacy-note p { font-size:0.78rem; color:var(--muted); }
@@ -267,7 +272,10 @@
       <span class="upload-icon">📦</span>
       <div class="upload-main">Drag & drop your project ZIP, or click to browse</div>
       <div class="upload-hint">Max 50 MB · .zip only · All source files inside will be scanned</div>
-      <div class="upload-chosen" id="chosenFile"></div>
+      <div class="upload-chosen" id="chosenFile">
+        <span class="upload-chosen-name" id="chosenFileName"></span>
+        <button class="cancel-btn" id="cancelBtn" onclick="cancelUpload(event)">✕ Cancel</button>
+      </div>
     </div>
     <div class="privacy-note">
       <span style="font-size:1rem;flex-shrink:0;margin-top:1px">🔒</span>
@@ -398,11 +406,8 @@
 <script>
 let selectedFile  = null;
 let timerInterval = null;
-let stepTimeouts  = [];   // stores all pending step setTimeout IDs so we can cancel them
+let stepTimeouts  = [];
 
-// How long (ms) to stay on each step before moving to the next.
-// Steps 0-3 advance automatically during the wait.
-// Step 4 (final) is NEVER advanced by a timer — only stopLoader() completes it.
 const STEP_DURATIONS = [900, 1800, 2200, 2800];
 
 function startLoader() {
@@ -420,16 +425,11 @@ function startLoader() {
       ((Date.now() - start) / 1000).toFixed(1) + 's';
   }, 100);
 
-  // Advance steps 0 → 3 on a timer so the UI shows activity while waiting.
-  // Step 4 (Computing risk scores) is intentionally NEVER triggered here.
-  // It only completes when stopLoader() is called — i.e. when the real server
-  // response actually arrives.
   let cumulative = 0;
   stepTimeouts = [];
   STEP_DURATIONS.forEach((dur, idx) => {
     cumulative += dur;
     const id = setTimeout(() => {
-      // Mark current step done, activate next — but never past step 3
       document.getElementById('step' + idx).classList.remove('active');
       document.getElementById('step' + idx).classList.add('done');
       document.getElementById('step' + (idx + 1)).classList.add('active');
@@ -439,19 +439,16 @@ function startLoader() {
 }
 
 function stopLoader() {
-  // Cancel any step transitions that haven't fired yet
   stepTimeouts.forEach(id => clearTimeout(id));
   stepTimeouts = [];
   clearInterval(timerInterval);
 
-  // Snap whatever state we're in: all steps → done
   for (let i = 0; i < 5; i++) {
     const s = document.getElementById('step' + i);
     s.classList.remove('active');
     s.classList.add('done');
   }
 
-  // Brief pause so the user sees "all done" before the panel hides
   setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 520);
 }
 
@@ -460,12 +457,25 @@ function toggleGuide() {
   document.getElementById('guideChev').classList.toggle('open');
 }
 
+// ── File selection ────────────────────────────────────────────────────────
 function handleFile(file) {
   if (!file) return;
   selectedFile = file;
-  document.getElementById('chosenFile').textContent =
-    '✓ ' + file.name + ' (' + (file.size/1024/1024).toFixed(2) + ' MB)';
+  document.getElementById('chosenFileName').textContent =
+    '✓ ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+  document.getElementById('cancelBtn').style.display = 'inline-flex';
   document.getElementById('analyzeBtn').disabled = false;
+}
+
+// ── Cancel / clear selection ──────────────────────────────────────────────
+function cancelUpload(e) {
+  e.stopPropagation();                                  // don't re-open the file picker
+  selectedFile = null;
+  document.getElementById('chosenFileName').textContent = '';
+  document.getElementById('cancelBtn').style.display = 'none';
+  document.getElementById('zipInput').value = '';       // reset so same file can be re-selected
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('dropZone').classList.remove('drag');
 }
 
 function handleDrop(e) {
@@ -487,7 +497,6 @@ async function analyzeProject() {
   formData.append('project_zip', selectedFile);
 
   try {
-    // The spinner keeps running until this await resolves — no fake progress
     const res  = await fetch('/analyze', { method:'POST', body:formData });
     const data = await res.json();
 
@@ -500,10 +509,9 @@ async function analyzeProject() {
     renderLangBar(data.summary.lang_counts);
     renderFiles(data.results);
 
-    // Delay slightly so "all steps done" state is visible before results appear
     setTimeout(() => {
       results.style.display = 'block';
-      results.offsetHeight; // force reflow
+      results.offsetHeight;
       results.classList.add('visible');
     }, 560);
 
@@ -568,10 +576,6 @@ function metricValueClass(k, v) {
   return v<=t[0]?'val-good':v<=t[1]?'val-warn':'val-bad';
 }
 
-// ── generateFixes ─────────────────────────────────────────────────────────
-// Generates actionable fix suggestions entirely from the metrics object
-// that app.py already sends. The backend never sends a "fixes" field, so
-// we build this client-side. renderFixes() calls this and renders the panel.
 function generateFixes(metrics, language) {
   const fixes = [];
   const lang = language || 'Python';
@@ -584,9 +588,7 @@ function generateFixes(metrics, language) {
   const tc   = metrics['Test coverage est.'] || 0;
   const coup = metrics['Coupling'] || 0;
   const cd   = metrics['Comment density'] || 0;
-  const fn   = metrics['Functions'] || 0;
 
-  // ── Security issues ──────────────────────────────────────────────────────
   if (sec >= 1) {
     const isPy = lang === 'Python';
     fixes.push({
@@ -603,7 +605,6 @@ function generateFixes(metrics, language) {
     });
   }
 
-  // ── Static warnings ──────────────────────────────────────────────────────
   if (sw >= 4) {
     fixes.push({
       severity: 'critical',
@@ -624,7 +625,6 @@ function generateFixes(metrics, language) {
     });
   }
 
-  // ── Cyclomatic complexity ────────────────────────────────────────────────
   if (cc > 20) {
     fixes.push({
       severity: 'critical',
@@ -645,7 +645,6 @@ function generateFixes(metrics, language) {
     });
   }
 
-  // ── Test coverage ────────────────────────────────────────────────────────
   if (tc < 0.10) {
     fixes.push({
       severity: 'warning',
@@ -663,7 +662,6 @@ function generateFixes(metrics, language) {
     });
   }
 
-  // ── Duplication ──────────────────────────────────────────────────────────
   if (dup > 0.30) {
     fixes.push({
       severity: 'warning',
@@ -675,7 +673,6 @@ function generateFixes(metrics, language) {
     });
   }
 
-  // ── Comment density ──────────────────────────────────────────────────────
   if (cd < 0.03 && loc > 50) {
     fixes.push({
       severity: 'info',
@@ -689,7 +686,6 @@ function generateFixes(metrics, language) {
     });
   }
 
-  // ── Coupling ────────────────────────────────────────────────────────────
   if (coup > 15) {
     fixes.push({
       severity: 'info',
