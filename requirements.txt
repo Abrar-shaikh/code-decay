@@ -7,8 +7,6 @@ scikit-learn
 scipy
 imbalanced-learn
 networkx
-radon
-werkzeug
 gspread
 google-auth
 xgboost
