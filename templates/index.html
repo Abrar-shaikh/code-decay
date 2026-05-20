@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Code Decay Detector</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root {
       /* ── Foreground / text ── */
@@ -108,6 +109,13 @@
     .stat { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; box-shadow:0 1px 4px rgba(92,74,68,0.07); }
     .stat .num { font-size:2rem; font-weight:700; }
     .stat .lbl { color:var(--muted); font-size:0.74rem; margin-top:5px; }
+    /* ── Dashboard chart ── */
+    .chart-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:24px 26px; margin-bottom:20px; box-shadow:0 1px 4px rgba(92,74,68,0.07),0 4px 16px rgba(92,74,68,0.05); }
+    .chart-title { font-size:0.69rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+    .chart-title::after { content:''; flex:1; height:1px; background:var(--border); }
+    .chart-wrap { position:relative; height:220px; }
+    .download-btn { display:inline-flex; align-items:center; gap:7px; margin-top:16px; padding:9px 18px; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-size:0.8rem; color:var(--muted); cursor:pointer; transition:border-color .2s,color .2s; text-decoration:none; }
+    .download-btn:hover { border-color:var(--terra); color:var(--terra); }
     .lang-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; align-items:center; }
     .lang-bar-label { font-size:0.75rem; color:var(--muted); }
     .lang-tag { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:5px 12px; font-size:0.79rem; color:var(--cream); }
@@ -397,8 +405,12 @@
   <div id="results">
     <div class="summary" id="summary"></div>
     <div class="lang-bar" id="langBar"></div>
+    <div class="chart-card">
+      <div class="chart-title">Risk Score — All Files</div>
+      <div class="chart-wrap"><canvas id="riskChart"></canvas></div>
+      <button class="download-btn" onclick="downloadCSV()">⬇ Download Report as CSV</button>
+    </div>
     <div id="fileList"></div>
-  </div>
 
 </div>
 <div class="toast" id="toast"></div>
@@ -508,6 +520,7 @@ async function analyzeProject() {
     renderSummary(data.summary);
     renderLangBar(data.summary.lang_counts);
     renderFiles(data.results);
+    buildChart(data.results);
 
     setTimeout(() => {
       results.style.display = 'block';
@@ -788,6 +801,100 @@ function renderFiles(results) {
 function toggle(i) {
   document.getElementById('det'+i).classList.toggle('open');
   document.getElementById('chev'+i).classList.toggle('open');
+}
+// ── Risk chart ────────────────────────────────────────────────────────────
+let _chartInstance = null;
+let _lastResults   = [];
+
+function buildChart(results) {
+  _lastResults = results;
+  const MAX_LABELS = 30;
+  const data = results.slice(0, MAX_LABELS);
+
+  const labels = data.map(r => r.filename.length > 18
+    ? r.filename.slice(0, 16) + '…' : r.filename);
+
+  const colors = data.map(r =>
+    r.risk_score > 70 ? 'rgba(168,72,72,0.82)' :
+    r.risk_score > 40 ? 'rgba(143,106,48,0.82)' :
+                        'rgba(78,105,96,0.82)');
+
+  const borderColors = data.map(r =>
+    r.risk_score > 70 ? '#A84848' :
+    r.risk_score > 40 ? '#8F6A30' : '#4E6960');
+
+  if (_chartInstance) _chartInstance.destroy();
+
+  const ctx = document.getElementById('riskChart').getContext('2d');
+  _chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Risk Score (%)',
+        data: data.map(r => r.risk_score),
+        backgroundColor: colors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => results[items[0].dataIndex].filename,
+            label: (item)  => [
+              ` Risk: ${item.raw}%`,
+              ` Verdict: ${results[item.dataIndex].is_defective ? '⚠ At Risk' : '✓ Healthy'}`,
+              ` Models: ${results[item.dataIndex].votes_defective}/5 flagged`
+            ]
+          }
+        }
+      },
+      scales: {
+        y: {
+          min: 0, max: 100,
+          ticks: { color: '#9A8880', font: { size: 11 }, callback: v => v + '%' },
+          grid:  { color: '#E4DAD5' }
+        },
+        x: {
+          ticks: { color: '#9A8880', font: { size: 10 }, maxRotation: 35 },
+          grid:  { display: false }
+        }
+      }
+    }
+  });
+}
+
+// ── CSV download ──────────────────────────────────────────────────────────
+function downloadCSV() {
+  if (!_lastResults.length) return;
+  const headers = ['Filename','Filepath','Language','Risk Score (%)','Verdict','Models Flagged','Cyclomatic Complexity','Lines of Code','Security Issues','Static Warnings','Test Coverage','Duplication %'];
+  const rows = _lastResults.map(r => [
+    r.filename,
+    r.filepath,
+    r.language,
+    r.risk_score,
+    r.is_defective ? 'At Risk' : 'Healthy',
+    r.votes_defective + '/5',
+    r.metrics['Cyclomatic complexity'] ?? '',
+    r.metrics['Lines of code'] ?? '',
+    r.metrics['Security issues'] ?? '',
+    r.metrics['Static warnings'] ?? '',
+    r.metrics['Test coverage est.'] ?? '',
+    r.metrics['Duplication %'] ?? ''
+  ].map(v => `"${v}"`).join(','));
+
+  const csv  = [headers.join(','), ...rows].join('\n');
+  const blob = new URL('data:text/csv;charset=utf-8,' + encodeURIComponent(csv));
+  const a    = document.createElement('a');
+  a.href     = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'coderot-report.csv';
+  a.click();
 }
 </script>
 </body>
